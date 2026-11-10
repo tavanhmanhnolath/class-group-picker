@@ -64,10 +64,35 @@ a{color:var(--accent)}
 .pool .av{width:20px;height:20px;font-size:.7rem}
 .tiny{min-height:30px;padding:2px 8px;font-size:.8rem}
 @media (prefers-reduced-motion:reduce){button{transition:none}}
+/* cartoon chase: a schoolgirl runs from a paper ghost (all drawn in SVG, no image files) */
+#chase{position:relative;height:108px;overflow:hidden;max-width:960px;margin:8px auto 0;border-bottom:3px dashed var(--line)}
+#chase[hidden]{display:none}
+#chase .pair{position:absolute;left:-210px;bottom:6px;display:flex;align-items:flex-end;gap:38px;animation:chase-run 11s linear infinite}
+#chase .stuwrap{position:relative}
+#chase .say{position:absolute;left:-4px;top:-14px;font-size:.72rem;line-height:1.5;white-space:nowrap;background:var(--card);border:2px solid var(--c3);color:var(--ink);border-radius:999px;padding:0 9px;animation:chase-say .7s ease-in-out infinite}
+#chase .leg,#chase .arm{transform-box:fill-box;transform-origin:50% 8%}
+#chase .legA{animation:legA .36s ease-in-out infinite}
+#chase .legB{animation:legB .36s ease-in-out infinite}
+#chase .arm{animation:armS .36s ease-in-out infinite}
+#chase .bodybob{animation:bob .36s ease-in-out infinite}
+#chase .ghwrap{animation:lunge 1.8s ease-in-out infinite}
+#chase .gfloat{animation:gfloat 1.2s ease-in-out infinite}
+#chase .sweat{animation:sweat .8s ease-in infinite}
+@keyframes chase-run{from{left:-210px}to{left:100%}}
+@keyframes legA{0%,100%{transform:rotate(40deg)}50%{transform:rotate(-40deg)}}
+@keyframes legB{0%,100%{transform:rotate(-40deg)}50%{transform:rotate(40deg)}}
+@keyframes armS{0%,100%{transform:rotate(-55deg)}50%{transform:rotate(55deg)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes gfloat{0%,100%{transform:translateY(-2px) rotate(-3deg)}50%{transform:translateY(-12px) rotate(3deg)}}
+@keyframes lunge{0%,100%{transform:translateX(0)}50%{transform:translateX(14px)}}
+@keyframes sweat{0%{transform:translateY(0);opacity:1}100%{transform:translateY(10px);opacity:0}}
+@keyframes chase-say{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){#chase .pair{animation:none;left:calc(50% - 100px)}#chase *{animation:none!important}}
 </style>
 </head>
 <body>
 <main id="app"></main>
+<footer id="chase" aria-hidden="true"></footer>
 <script>
 // ====== ໃສ່ຄ່າຈາກ Supabase > Project Settings > API ======
 const SUPABASE_URL = 'https://bnlyewxojqbpfuiakpqr.supabase.co';
@@ -136,6 +161,7 @@ function subscribe() {
       later(render);
     })
     .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, () => later(async () => { await load(); render(); }))
+    .on('postgres_changes', {event:'*', schema:'public', table:'students'}, () => later(async () => { students = []; await load(); render(); }))
     .subscribe(status => {
       // after a dropped connection, resync once so nothing is missed
       if (status === 'SUBSCRIBED' && channel.__wasDown) { channel.__wasDown = false; load().then(render); }
@@ -162,6 +188,7 @@ function render() {
   if (r === 'admin') renderAdmin();
   else if (r.startsWith('a/')) renderActivity(r.slice(2));
   else renderHome();
+  document.getElementById('chase').hidden = r === 'admin';
   const now = [...app.querySelectorAll('input')];
   if (!skipRestore && now.length === typed.length) {
     now.forEach((i, k) => { if (typed[k] !== '' && i.value !== typed[k]) i.value = typed[k]; });
@@ -261,7 +288,7 @@ function renderAdmin() {
   }
   const admin = async (fn, args) => {
     const r = await rpc(fn, {p_pin: pin, ...args});
-    if (r.error && /ລະຫັດ/.test(r.error.message)) { try { sessionStorage.removeItem('pin'); } catch {} render(); }
+    if (r.error && /ລະຫັດແອດມິນ|รหัสแอดมิน/.test(r.error.message)) { try { sessionStorage.removeItem('pin'); } catch {} render(); }
     return r;
   };
 
@@ -285,6 +312,43 @@ function renderAdmin() {
       h('a', {href:u, download:'student_pins.csv'}).click();
       setTimeout(() => URL.revokeObjectURL(u), 1000);
     }}, 'ດາວໂຫຼດ PIN ນັກສຶກສາ (CSV)'))));
+
+  // ---- extra students (e.g. retakers): add, set PIN, remove ----
+  const gName = h('input', {placeholder:'ຊື່ ແລະ ນາມສະກຸນ', 'aria-label':'ຊື່ນັກສຶກສາເພີ່ມ', style:'min-width:200px'});
+  const gSex = h('select', {'aria-label':'ຄຳນຳໜ້າ'}, h('option', {value:'ນາງ'}, 'ນາງ'), h('option', {value:'ທ້າວ'}, 'ທ້າວ'));
+  const gCode = h('input', {placeholder:'ລະຫັດນັກສຶກສາ (ບໍ່ບັງຄັບ)', 'aria-label':'ລະຫັດນັກສຶກສາ', style:'width:210px'});
+  const gPin = h('input', {placeholder:'PIN 4 ຕົວ', inputmode:'numeric', maxlength:4, 'aria-label':'PIN', style:'width:110px'});
+  const adminStu = (fn, args) => { students = []; return admin(fn, args); };
+  const guests = students.filter(s => s.is_guest);
+  const pinSel = h('select', {'aria-label':'ເລືອກນັກສຶກສາ', onchange: e => { drafts.pinSel = e.target.value; }},
+    h('option', {value:''}, '— ເລືອກນັກສຶກສາ —'),
+    students.map(s => h('option', {value:s.code, selected: drafts.pinSel === s.code}, `${s.no}. ${label(s)}`)));
+  const newPin = h('input', {placeholder:'PIN ໃໝ່ 4 ຕົວ', inputmode:'numeric', maxlength:4, 'aria-label':'PIN ໃໝ່', style:'width:120px'});
+  app.append(h('details', {class:'card', style:'margin-top:12px', open: drafts.stuOpen ? '' : null, ontoggle: e => { drafts.stuOpen = e.target.open; }},
+    h('summary', {}, 'ເພີ່ມນັກສຶກສານອກລາຍຊື່ / ຕັ້ງ PIN (ຟັງຊັນເສີມ)'),
+    h('div', {class:'mute'}, 'ສຳລັບຄົນທີ່ມາຮຽນຄືນ ຫຼື ຄົນທີ່ບໍ່ຢູ່ໃນລາຍຊື່ຫ້ອງ'),
+    h('div', {class:'row'}, gSex, gName, gCode, gPin, h('button', {class:'primary', onclick: async () => {
+      drafts.note = '';
+      const name = gName.value.trim(), code = gCode.value.trim(); let pv = gPin.value.trim();
+      if (!name) { toast = 'ກະລຸນາໃສ່ຊື່'; return render(); }
+      if (!pv && code.length >= 4) pv = code.slice(-4);
+      if (!/^\d{4}$/.test(pv)) { toast = 'PIN ຕ້ອງເປັນຕົວເລກ 4 ຕົວ (ຫຼືໃສ່ລະຫັດນັກສຶກສາ ເພື່ອໃຊ້ 4 ຕົວທ້າຍ)'; return render(); }
+      const r = await adminStu('admin_add_student', {p_name:name, p_gender:gSex.value, p_code:code, p_student_pin:pv});
+      if (!r.error) { drafts.note = `ເພີ່ມ ${name} ແລ້ວ`; skipRestore = true; render(); }
+    }}, 'ເພີ່ມ')),
+    h('div', {class:'mute'}, 'ຖ້າບໍ່ໃສ່ PIN ແຕ່ໃສ່ລະຫັດນັກສຶກສາ ລະບົບໃຊ້ 4 ຕົວທ້າຍຂອງລະຫັດເປັນ PIN'),
+    h('div', {class:'row'}, pinSel, newPin, h('button', {onclick: async () => {
+      drafts.note = '';
+      const code = pinSel.value, pv = newPin.value.trim();
+      if (!code || !/^\d{4}$/.test(pv)) { toast = 'ເລືອກນັກສຶກສາ ແລະ ໃສ່ PIN ເປັນຕົວເລກ 4 ຕົວ'; return render(); }
+      const r = await admin('admin_set_student_pin', {p_code:code, p_student_pin:pv});
+      if (!r.error) { drafts.note = 'ຕັ້ງ PIN ແລ້ວ'; skipRestore = true; render(); }
+    }}, 'ຕັ້ງ PIN')),
+    drafts.note ? h('div', {class:'mute'}, '✓ ' + drafts.note) : null,
+    guests.length ? h('div', {}, h('b', {}, `ນັກສຶກສາທີ່ເພີ່ມເອງ (${guests.length})`),
+      guests.map(s => h('div', {class:'row', style:'margin:2px 0'},
+        h('span', {style:'flex:1;min-width:160px'}, `${s.no}. ${label(s)} · ${s.code}`),
+        h('button', {class:'danger', onclick: () => confirm(`ລຶບ ${label(s)} ອອກຈາກລະບົບ?`) && adminStu('admin_remove_student', {p_code:s.code})}, 'ລຶບ')))) : null));
 
   const codes = byCode();
   for (const a of activities) {
@@ -341,6 +405,40 @@ function exportCsv(a, ms, codes) {
   h('a', {href:u, download:`groups_${a.title}.csv`}).click();
   setTimeout(() => URL.revokeObjectURL(u), 1000);
 }
+
+// ---- cartoon: schoolgirl running away from a paper ghost ----
+document.getElementById('chase').innerHTML = `<div class="pair">
+  <div class="ghwrap"><svg viewBox="0 0 74 84" width="64" height="74">
+    <ellipse cx="36" cy="80" rx="15" ry="2.6" fill="#3a1010" opacity=".13"/>
+    <g class="gfloat">
+      <path d="M10 14Q10 6 18 6H50L62 18V62Q58 72 53 62Q49 72 44 62Q39 72 35 62Q30 72 26 62Q21 72 16 62Q10 68 10 62Z" fill="#fffcf6" stroke="#972828" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M50 6V18H62Z" fill="#fcad38" stroke="#972828" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M18 52H54M18 58H44" stroke="#f4dcb9" stroke-width="2" stroke-linecap="round"/>
+      <ellipse cx="27" cy="30" rx="4" ry="5.5" fill="#3a1010"/><ellipse cx="43" cy="30" rx="4" ry="5.5" fill="#3a1010"/>
+      <circle cx="28.3" cy="28" r="1.5" fill="#fff"/><circle cx="44.3" cy="28" r="1.5" fill="#fff"/>
+      <circle cx="21" cy="38" r="3.2" fill="#e45742" opacity=".55"/><circle cx="49" cy="38" r="3.2" fill="#e45742" opacity=".55"/>
+      <path d="M29 39Q35 51 41 39Z" fill="#972828"/><path d="M32 44.5Q35 48 38 44.5Q35 43 32 44.5Z" fill="#e45742"/>
+      <path d="M62 30Q70 27 72 20M62 42Q71 42 73 36" stroke="#972828" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    </g></svg></div>
+  <div class="stuwrap"><span class="say">ຊ່ວຍແດ່!</span>
+    <svg viewBox="0 0 64 84" width="56" height="74">
+    <ellipse cx="34" cy="80" rx="16" ry="3" fill="#3a1010" opacity=".13"/>
+    <g class="bodybob">
+      <g class="leg legA"><rect x="29" y="54" width="6" height="17" rx="3" fill="#ffd9a8"/><ellipse cx="34" cy="72" rx="6.5" ry="3.3" fill="#972828"/></g>
+      <g class="leg legB"><rect x="38" y="54" width="6" height="17" rx="3" fill="#ffd9a8"/><ellipse cx="43" cy="72" rx="6.5" ry="3.3" fill="#972828"/></g>
+      <rect x="17" y="35" width="11" height="17" rx="4" fill="#eb7f31"/>
+      <path d="M27 36H45L50 58H23Z" fill="#e45742"/>
+      <g class="arm"><rect x="35" y="37" width="5" height="15" rx="2.5" fill="#ffd9a8"/></g>
+      <circle cx="33" cy="22" r="15" fill="#972828"/>
+      <circle cx="37" cy="24" r="12" fill="#ffd9a8"/>
+      <path d="M25 21Q36 7 49 20Q38 15 25 21Z" fill="#972828"/>
+      <path d="M22 10L16 7L17 14ZM22 10L26 4L28 11Z" fill="#fcad38"/>
+      <circle cx="42" cy="25" r="1.8" fill="#3a1010"/>
+      <ellipse cx="45" cy="31" rx="2.3" ry="2.8" fill="#972828"/>
+      <circle cx="40" cy="29" r="2.6" fill="#e45742" opacity=".55"/>
+      <path class="sweat" d="M16 16q-3 5 0 7q3-2 0-7z" fill="#fff6e8" stroke="#eb7f31" stroke-width="1"/>
+    </g></svg></div>
+</div>`;
 
 window.addEventListener('hashchange', render);
 load().then(() => { render(); subscribe(); });
