@@ -5,39 +5,65 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ແບ່ງກຸ່ມ BF124</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700&family=Noto+Sans+Lao+Looped:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mute:#667085;--line:#e3e7ee;--accent:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--me:#eaf1ff}
-@media (prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212c;--ink:#e8ecf3;--mute:#93a0b4;--line:#2a3342;--accent:#5b8cff;--me:#1d2a45}}
+/* palette: only #972828 #e45742 #eb7f31 #fcad38; other tokens are tints/shades of them */
+:root{--c1:#972828;--c2:#e45742;--c3:#eb7f31;--c4:#fcad38;
+  --bg:#fff4e3;--card:#fffcf6;--ink:#3a1010;--mute:#85503f;--line:#f6dfbd;--accent:#972828;--accent-ink:#fff6e8;
+  --me:#fde5c6;--bad:#972828;--shadow:rgba(151,40,40,.28);--errbg:#ffd9cf;--errink:#7a1c1c;
+  --display:'Noto Sans Lao Looped','Noto Sans Lao',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#2a0c0c;--card:#3a1414;--ink:#ffe9c9;--mute:#e0b48f;--line:#5a2323;--accent:#fcad38;--accent-ink:#2a0c0c;
+  --me:#4a1c1a;--bad:#fcad38;--shadow:rgba(0,0,0,.45);--errbg:#5a2323;--errink:#ffd2c4}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans Lao',system-ui,sans-serif;line-height:1.5}
-main{max-width:960px;margin:0 auto;padding:16px}
-h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1.05rem;margin:0}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans Lao',system-ui,sans-serif;line-height:1.55}
+main{max-width:960px;margin:0 auto;padding:16px 16px 48px}
+h1{font-family:var(--display);font-size:1.6rem;margin:0;line-height:1.25}
+h2{font-family:var(--display);font-size:1.05rem;margin:0}
 .mute{color:var(--mute);font-size:.9rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px}
-.card.me{border-color:var(--accent);background:var(--me)}
-.card.full{opacity:.65}
-.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.count{font-size:.85rem;color:var(--mute)}.count.full{color:var(--bad);font-weight:600}
-ul{list-style:none;margin:0 0 8px;padding:0;min-height:24px}
-li{padding:2px 0;font-size:.92rem;display:flex;justify-content:space-between;gap:6px}
+.hero{position:relative;overflow:hidden;border-radius:26px;padding:22px 20px 20px;margin-bottom:16px;color:#3a1010;
+  background:linear-gradient(135deg,var(--c4) 0%,var(--c3) 58%,var(--c2) 100%);box-shadow:0 10px 24px -14px var(--shadow)}
+.hero::before,.hero::after{content:"";position:absolute;border-radius:50%;background:rgba(255,246,232,.28);pointer-events:none}
+.hero::before{width:140px;height:140px;right:-30px;top:-50px}
+.hero::after{width:80px;height:80px;right:70px;bottom:-34px;background:rgba(255,246,232,.2)}
+.hero .sub{position:relative;font-size:.95rem;margin-top:4px;opacity:.9}
+.hero h1{position:relative}
+.card{background:var(--card);border:2px solid var(--line);border-radius:22px;padding:14px;box-shadow:0 8px 18px -14px var(--shadow)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.card.me{border-color:var(--c3);background:var(--me)}
+.card.full:not(.me){opacity:.7}
+.g1{--gc:var(--c1);--gi:#fff6e8}.g2{--gc:var(--c2);--gi:#2a0c0c}.g3{--gc:var(--c3);--gi:#2a0c0c}.g4{--gc:var(--c4);--gi:#2a0c0c}
+@media (prefers-color-scheme:dark){.g1{--gc:#ffd08a;--gi:#2a0c0c}.g2{--gc:var(--c4)}.g3{--gc:var(--c3)}.g4{--gc:var(--c2)}}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.gt{display:flex;align-items:center;gap:8px;min-width:0}
+.badge{width:34px;height:34px;border-radius:50%;background:var(--gc,var(--c3));color:var(--gi,#2a0c0c);display:grid;place-items:center;font-family:var(--display);font-weight:700;flex:none}
+.cnt{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--mute);font-variant-numeric:tabular-nums}
+.cnt.full{color:var(--bad);font-weight:600}
+.dots{display:inline-flex;gap:3px}.dots i{width:9px;height:9px;border-radius:50%;border:2px solid var(--gc,var(--c3));display:block}
+.dots i.on{background:var(--gc,var(--c3))}
+ul{list-style:none;margin:0 0 10px;padding:0;min-height:30px}
+li{padding:3px 0;font-size:.92rem;display:flex;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere}
 li.self{font-weight:700;color:var(--accent)}
+li.empty{color:var(--mute);font-size:.82rem}
+.av{width:24px;height:24px;border-radius:50%;background:var(--gc,var(--c3));color:var(--gi,#2a0c0c);display:grid;place-items:center;font-size:.78rem;font-weight:600;flex:none}
 button,select,input{font:inherit}
-button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button{border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 16px;cursor:pointer;min-height:42px;transition:transform .12s,box-shadow .12s}
+button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 12px -8px var(--shadow)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
 button.danger{color:var(--bad)}
-button:disabled{opacity:.5;cursor:not-allowed}
-select,input{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px;min-height:40px;max-width:100%}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
-.banner{padding:10px 12px;border-radius:10px;margin-top:12px;font-size:.92rem}
-.banner.lock{background:#fff4e5;color:#8a4b00}.banner.err{background:#fde8e8;color:#9b1c1c}
-@media (prefers-color-scheme:dark){.banner.lock{background:#3a2a10;color:#ffd699}.banner.err{background:#3a1717;color:#ffb3b3}}
+button:disabled{opacity:.45;cursor:not-allowed}
+.card button.primary{width:100%}
+:focus-visible{outline:3px solid var(--c3);outline-offset:2px}
+select,input{border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:8px 12px;min-height:42px;max-width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.banner{padding:11px 14px;border-radius:16px;margin-top:12px;font-size:.92rem}
+.banner.lock{background:var(--c4);color:#3a1010}.banner.err{background:var(--errbg);color:var(--errink)}
 a{color:var(--accent)}
 .nav{display:flex;justify-content:space-between;margin-bottom:12px;font-size:.9rem}
-.pool{margin-top:16px}.pool span{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:3px;font-size:.85rem;background:var(--card)}
+.pool{margin-top:20px}.pool span{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);border-radius:999px;padding:2px 12px 2px 4px;margin:4px 4px 0 0;font-size:.84rem;background:var(--card)}
+.pool .av{width:20px;height:20px;font-size:.7rem}
 .tiny{min-height:30px;padding:2px 8px;font-size:.8rem}
+@media (prefers-reduced-motion:reduce){button{transition:none}}
 </style>
 </head>
 <body>
@@ -116,9 +142,12 @@ function render() {
   return renderHome();
 }
 
+const hero = (title, sub) => h('header', {class:'hero'}, h('h1', {}, title), sub ? h('div', {class:'sub'}, sub) : null);
+const initial = s => Array.from(s.name.trim()).find(c => !'ເແໂໄໃ'.includes(c)) || '?';
+
 function renderHome() {
-  app.append(h('h1', {}, 'ແບ່ງກຸ່ມ BF124'), h('div', {class:'mute'}, 'ເລືອກກິດຈະກຳ'));
-  if (!activities.length) app.append(h('div', {class:'card', style:'margin-top:12px'}, 'ຍັງບໍ່ມີກິດຈະກຳ'));
+  app.append(hero('ແບ່ງກຸ່ມ BF124', 'ເລືອກກຸ່ມກັບເພື່ອນໆ ✿'));
+  if (!activities.length) app.append(h('div', {class:'card', style:'margin-top:12px'}, 'ຍັງບໍ່ມີກິດຈະກຳ ລໍຖ້າແອດມິນສ້າງກ່ອນນະ ♡'));
   for (const a of activities)
     app.append(h('a', {href:'#/a/' + a.id, style:'text-decoration:none;color:inherit'},
       h('div', {class:'card', style:'margin-top:12px'},
@@ -129,14 +158,14 @@ function renderHome() {
 
 function renderActivity(id) {
   const a = activities.find(x => x.id === id);
-  app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')));
-  if (!a) return app.append(h('div', {class:'card'}, 'ບໍ່ພົບກິດຈະກຳ'));
+  if (!a) return app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')), h('div', {class:'card'}, 'ບໍ່ພົບກິດຈະກຳ'));
   const codes = byCode();
   const mine = me();
   const ms = members.filter(m => m.activity_id === id);
   const myGroup = ms.find(m => m.student_code === mine)?.group_no;
 
-  app.append(h('h1', {}, a.title), h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ`));
+  app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')),
+    hero(a.title, `${a.group_count} ກຸ່ມ · ກຸ່ມລະ ${a.group_size} ຄົນ`));
   if (a.locked) app.append(h('div', {class:'banner lock'}, '🔒 ກິດຈະກຳນີ້ຖືກລ໋ອກແລ້ວ ປ່ຽນກຸ່ມບໍ່ໄດ້'));
 
   // ເລືອກຊື່ຕົນເອງ
@@ -168,10 +197,17 @@ function renderActivity(id) {
       class: isMine ? '' : 'primary',
       disabled: !mine || !mypin || a.locked || isMine || isFull,
       onclick: () => rpc('join_group', {p_activity:id, p_code:mine, p_pin:mypin, p_group:g}),
-    }, isMine ? 'ເຈົ້າຢູ່ກຸ່ມນີ້' : isFull ? 'ເຕັມ' : myGroup ? 'ຍ້າຍມາກຸ່ມນີ້' : 'ເຂົ້າກຸ່ມນີ້');
-    grid.append(h('div', {class:'card' + (isMine ? ' me' : '') + (isFull && !isMine ? ' full' : '')},
-      h('div', {class:'head'}, h('h2', {}, 'ກຸ່ມ ' + g), h('span', {class:'count' + (isFull ? ' full' : '')}, `${gm.length}/${a.group_size}`)),
-      h('ul', {}, gm.map(m => h('li', {class: m.student_code === mine ? 'self' : ''}, codes[m.student_code] ? label(codes[m.student_code]) : m.student_code))),
+    }, isMine ? 'ເຈົ້າຢູ່ກຸ່ມນີ້ ♡' : isFull ? 'ເຕັມແລ້ວ' : myGroup ? 'ຍ້າຍມາກຸ່ມນີ້' : 'ເຂົ້າກຸ່ມນີ້');
+    const dots = a.group_size <= 8
+      ? h('span', {class:'dots'}, Array.from({length:a.group_size}, (_, i) => h('i', {class: i < gm.length ? 'on' : ''})))
+      : null;
+    grid.append(h('div', {class:'card g' + ((g - 1) % 4 + 1) + (isMine ? ' me' : '') + (isFull && !isMine ? ' full' : '')},
+      h('div', {class:'head'}, h('div', {class:'gt'}, h('span', {class:'badge'}, g), h('h2', {}, 'ກຸ່ມ ' + g)),
+        h('span', {class:'cnt' + (isFull ? ' full' : '')}, dots, `${gm.length}/${a.group_size}`)),
+      h('ul', {}, gm.length
+        ? gm.map(m => { const st = codes[m.student_code];
+            return h('li', {class: m.student_code === mine ? 'self' : ''}, h('span', {class:'av'}, st ? initial(st) : '?'), st ? label(st) : m.student_code); })
+        : h('li', {class:'empty'}, 'ຍັງວ່າງ ມາເປັນຄົນທຳອິດນະ ♡')),
       btn));
   }
   app.append(grid);
@@ -179,11 +215,11 @@ function renderActivity(id) {
   const assigned = new Set(ms.map(m => m.student_code));
   const left = students.filter(s => !assigned.has(s.code));
   app.append(h('div', {class:'pool'}, h('b', {}, `ຍັງບໍ່ໄດ້ເລືອກກຸ່ມ (${left.length})`),
-    h('div', {}, left.map(s => h('span', {}, label(s))))));
+    h('div', {}, left.map(s => h('span', {}, h('i', {class:'av'}, initial(s)), label(s))))));
 }
 
 function renderAdmin() {
-  app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')), h('h1', {}, 'ແອດມິນ'));
+  app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')), hero('ແອດມິນ', 'ຈັດການກິດຈະກຳແບ່ງກຸ່ມ'));
   let pin = sget('pin');
   if (!pin) {
     const inp = h('input', {type:'password', placeholder:'ລະຫັດແອດມິນ'});
