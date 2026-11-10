@@ -104,15 +104,16 @@ const byCode = () => Object.fromEntries(students.map(s => [s.code, s]));
 const label = s => `${s.gender || ''} ${s.name}`.trim();
 const me = () => store.get('me');
 
+// students never change while the page is open, so they are fetched once
 async function load() {
   const [s, a, m] = await Promise.all([
-    sb.from('students').select('*').order('no'),
+    students.length ? {data: students} : sb.from('students').select('*').order('no'),
     sb.from('activities').select('*').order('created_at', {ascending:false}),
     sb.from('memberships').select('*'),
   ]);
   const err = s.error || a.error || m.error;
   if (err) { toast = 'ໂຫຼດຂໍ້ມູນບໍ່ໄດ້: ' + err.message; }
-  students = s.data || []; activities = a.data || []; members = m.data || [];
+  students = s.data || students; activities = a.data || activities; members = m.data || members;
 }
 async function rpc(fn, args) {
   const { data, error } = await sb.rpc(fn, args);
@@ -124,22 +125,49 @@ async function rpc(fn, args) {
 function subscribe() {
   if (channel) return;
   let t;
-  const refresh = () => { clearTimeout(t); t = setTimeout(async () => { await load(); render(); }, 150); };
+  const later = fn => { clearTimeout(t); t = setTimeout(fn, 150); };
+  // membership changes are applied straight from the event (no re-download), so a burst of
+  // joins costs each viewer zero extra queries; only activity edits trigger a reload
+  const sameKey = (a, b) => a.activity_id === b.activity_id && a.student_code === b.student_code;
   channel = sb.channel('live')
-    .on('postgres_changes', {event:'*', schema:'public', table:'memberships'}, refresh)
-    .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, refresh)
-    .subscribe();
+    .on('postgres_changes', {event:'*', schema:'public', table:'memberships'}, p => {
+      if (p.eventType === 'DELETE') members = members.filter(m => !sameKey(m, p.old));
+      else members = members.filter(m => !sameKey(m, p.new)).concat(p.new);
+      later(render);
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, () => later(async () => { await load(); render(); }))
+    .subscribe(status => {
+      // after a dropped connection, resync once so nothing is missed
+      if (status === 'SUBSCRIBED' && channel.__wasDown) { channel.__wasDown = false; load().then(render); }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') channel.__wasDown = true;
+    });
+  setInterval(async () => { // safety net: resync once a minute, redraw only if something differs
+    if (document.hidden) return;
+    const before = JSON.stringify([activities, members]);
+    await load();
+    if (JSON.stringify([activities, members]) !== before) render();
+  }, 60000);
 }
 
 const route = () => location.hash.replace(/^#\/?/, '');
 
+let skipRestore = false;
 function render() {
+  // live updates rebuild the page; keep what the person is typing and which box has focus
+  const old = [...app.querySelectorAll('input')];
+  const typed = old.map(i => i.value), focused = old.indexOf(document.activeElement);
   const r = route();
   app.replaceChildren();
   if (toast) app.append(h('div', {class:'banner err'}, toast));
-  if (r === 'admin') return renderAdmin();
-  if (r.startsWith('a/')) return renderActivity(r.slice(2));
-  return renderHome();
+  if (r === 'admin') renderAdmin();
+  else if (r.startsWith('a/')) renderActivity(r.slice(2));
+  else renderHome();
+  const now = [...app.querySelectorAll('input')];
+  if (!skipRestore && now.length === typed.length) {
+    now.forEach((i, k) => { if (typed[k] !== '' && i.value !== typed[k]) i.value = typed[k]; });
+    if (focused >= 0) now[focused].focus();
+  }
+  skipRestore = false;
 }
 
 const hero = (title, sub) => h('header', {class:'hero'}, h('h1', {}, title), sub ? h('div', {class:'sub'}, sub) : null);
@@ -218,6 +246,7 @@ function renderActivity(id) {
     h('div', {}, left.map(s => h('span', {}, h('i', {class:'av'}, initial(s)), label(s))))));
 }
 
+const drafts = {};
 function renderAdmin() {
   app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')), hero('ແອດມິນ', 'ຈັດການກິດຈະກຳແບ່ງກຸ່ມ'));
   let pin = sget('pin');
@@ -244,7 +273,7 @@ function renderAdmin() {
       h('button', {class:'primary', onclick: async () => {
         if (!title.value.trim() || !cnt.value || !size.value) { toast = 'ກະລຸນາໃສ່ຂໍ້ມູນໃຫ້ຄົບ'; return render(); }
         const r = await admin('admin_create_activity', {p_title: title.value.trim(), p_count: +cnt.value, p_size: +size.value});
-        if (r.data) location.hash = '#/admin';
+        if (r.data) { skipRestore = true; render(); }
       }}, 'ສ້າງ')),
     h('div', {class:'mute'}, `ນັກສຶກສາທັງໝົດ ${students.length} ຄົນ`),
     h('div', {class:'row'}, h('button', {onclick: async () => {
@@ -271,6 +300,22 @@ function renderAdmin() {
         h('button', {disabled: !left || a.locked, onclick: () => confirm(`ສຸ່ມຈັດຄົນທີ່ເຫຼືອ ${left} ຄົນ?`) && admin('admin_random_fill', {p_activity:a.id})}, `ສຸ່ມຄົນທີ່ເຫຼືອ (${left})`),
         h('button', {onclick:() => exportCsv(a, ms, codes)}, 'ດາວໂຫຼດ CSV'),
         h('button', {class:'danger', onclick:() => confirm('ລຶບກິດຈະກຳນີ້?') && admin('admin_delete_activity', {p_activity:a.id})}, 'ລຶບ')));
+    const dr = (drafts[a.id] ||= {open:false, title:a.title, count:a.group_count, size:a.group_size});
+    box.append(h('details', {open: dr.open ? '' : null, ontoggle: e => { dr.open = e.target.open; }},
+      h('summary', {}, 'ແກ້ໄຂຊື່ / ຈຳນວນກຸ່ມ / ຄົນຕໍ່ກຸ່ມ'),
+      h('div', {class:'row'},
+        h('input', {value:dr.title, 'aria-label':'ຊື່ກິດຈະກຳ', oninput: e => { dr.title = e.target.value; }}),
+        h('input', {type:'number', min:1, max:50, value:dr.count, style:'width:90px', 'aria-label':'ຈຳນວນກຸ່ມ', oninput: e => { dr.count = e.target.value; }}),
+        h('input', {type:'number', min:1, max:100, value:dr.size, style:'width:90px', 'aria-label':'ຄົນຕໍ່ກຸ່ມ', oninput: e => { dr.size = e.target.value; }}),
+        h('button', {class:'primary', onclick: async () => {
+          const cn = +dr.count, sz = +dr.size;
+          if (!(cn >= 1 && cn <= 50 && sz >= 1 && sz <= 100)) { toast = 'ຈຳນວນກຸ່ມ 1-50 ແລະ ຄົນຕໍ່ກຸ່ມ 1-100'; return render(); }
+          const gone = ms.filter(m => m.group_no > cn).length;
+          if (gone && !confirm(`ຫຼຸດເຫຼືອ ${cn} ກຸ່ມ ຈະຖອດ ${gone} ຄົນອອກຈາກກຸ່ມທີ່ຖືກລຶບ ດຳເນີນການຕໍ່ບໍ?`)) return;
+          const r = await admin('admin_update_activity', {p_activity:a.id, p_title:(dr.title || '').trim() || a.title, p_count:cn, p_size:sz});
+          if (!r.error) { delete drafts[a.id]; render(); }
+        }}, 'ບັນທຶກ')),
+      h('div', {class:'mute'}, 'ຫຼຸດຈຳນວນກຸ່ມ: ຄົນໃນກຸ່ມທີ່ຖືກລຶບຈະຖືກຖອດອອກ · ຫຼຸດຄົນຕໍ່ກຸ່ມ: ຕ້ອງຍ້າຍຄົນທີ່ເກີນອອກກ່ອນ')));
     const det = h('details', {}, h('summary', {}, 'ຍ້າຍ/ຖອດສະມາຊິກ'));
     for (const s of students) {
       const cur = ms.find(m => m.student_code === s.code)?.group_no ?? '';
