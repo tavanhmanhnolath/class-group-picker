@@ -69,18 +69,19 @@ a{color:var(--accent)}
 .hero::before,.hero::after{z-index:-1}
 .hero h1,.hero .sub{position:relative;z-index:1;max-width:56%}
 .hero .chase{position:absolute;right:0;bottom:0;width:44%;height:100%;overflow:hidden;pointer-events:none}
-.chase .pair{position:absolute;left:-210px;bottom:8px;display:flex;align-items:flex-end;gap:38px;animation:chase-run 9s linear var(--d,0s) infinite}
+.chase .pair{position:absolute;left:-300px;bottom:8px;display:flex;align-items:flex-end;gap:30px;animation:chase-run 10s linear var(--d,0s) infinite}
+.chase .kids{display:flex;align-items:flex-end;gap:2px}
 .chase .stuwrap{position:relative}
 .chase .say{position:absolute;left:-4px;top:-15px;font-size:.72rem;line-height:1.5;white-space:nowrap;background:var(--card);border:2px solid #972828;color:var(--ink);border-radius:999px;padding:0 9px;animation:chase-say .7s ease-in-out infinite}
 .chase .leg,.chase .arm{transform-box:fill-box;transform-origin:50% 8%}
-.chase .legA{animation:legA .36s ease-in-out infinite}
-.chase .legB{animation:legB .36s ease-in-out infinite}
-.chase .arm{animation:armS .36s ease-in-out infinite}
-.chase .bodybob{animation:bob .36s ease-in-out infinite}
+.chase .legA{animation:legA var(--sp,.36s) ease-in-out var(--ph,0s) infinite}
+.chase .legB{animation:legB var(--sp,.36s) ease-in-out var(--ph,0s) infinite}
+.chase .arm{animation:armS var(--sp,.36s) ease-in-out var(--ph,0s) infinite}
+.chase .bodybob{animation:bob var(--sp,.36s) ease-in-out var(--ph,0s) infinite}
 .chase .ghwrap{animation:lunge 1.8s ease-in-out infinite}
 .chase .gfloat{animation:gfloat 1.2s ease-in-out infinite}
 .chase .sweat{animation:sweat .8s ease-in infinite}
-@keyframes chase-run{from{left:-210px}to{left:100%}}
+@keyframes chase-run{from{left:-300px}to{left:100%}}
 @keyframes legA{0%,100%{transform:rotate(40deg)}50%{transform:rotate(-40deg)}}
 @keyframes legB{0%,100%{transform:rotate(-40deg)}50%{transform:rotate(40deg)}}
 @keyframes armS{0%,100%{transform:rotate(-55deg)}50%{transform:rotate(55deg)}}
@@ -89,8 +90,8 @@ a{color:var(--accent)}
 @keyframes lunge{0%,100%{transform:translateX(0)}50%{transform:translateX(14px)}}
 @keyframes sweat{0%{transform:translateY(0);opacity:1}100%{transform:translateY(10px);opacity:0}}
 @keyframes chase-say{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@media (max-width:620px){.hero h1,.hero .sub{max-width:none}.hero .chase{position:relative;width:100%;height:108px;margin-top:6px}}
-@media (prefers-reduced-motion:reduce){.chase .pair{animation:none;left:calc(50% - 100px)}.chase *{animation:none!important}}
+@media (max-width:620px){.hero h1,.hero .sub{max-width:none}.hero .chase{position:relative;width:100%;height:122px;margin-top:6px}}
+@media (prefers-reduced-motion:reduce){.chase .pair{animation:none;left:calc(50% - 140px)}.chase *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -427,39 +428,52 @@ function exportCsv(a, ms, codes) {
   setTimeout(() => URL.revokeObjectURL(u), 1000);
 }
 
-// ---- cartoon: schoolgirl running away from a paper ghost ----
+// ---- cartoon: three schoolkids running away from a paper ghost (own drawings, SVG, no image files) ----
+const SKIN = '#ffd9a8', INK = '#3a1010', RED = '#972828', CREAM = '#fff6e8';
+const kid = o => `<div class="stuwrap" style="--sp:${o.sp}s;--ph:${o.ph}s">${o.say ? `<span class="say">${o.say}</span>` : ''}
+  <svg viewBox="0 0 64 84" width="${o.w}" height="${o.h}">
+  <ellipse cx="34" cy="80" rx="16" ry="3" fill="${INK}" opacity=".13"/>
+  <g class="bodybob">
+    ${o.long ? `<path d="M23 22Q14 44 21 60L36 58L36 30Z" fill="${o.hair}"/>` : ''}
+    <g class="leg legA"><rect x="29" y="54" width="6" height="17" rx="3" fill="${o.legs || SKIN}" ${o.legs ? `stroke="${RED}" stroke-width=".8"` : ''}/>${o.socks ? `<rect x="29.5" y="64" width="5" height="6" fill="${CREAM}"/>` : ''}<ellipse cx="34" cy="72" rx="6.5" ry="3.3" fill="${o.shoes}"/></g>
+    <g class="leg legB"><rect x="38" y="54" width="6" height="17" rx="3" fill="${o.legs || SKIN}" ${o.legs ? `stroke="${RED}" stroke-width=".8"` : ''}/>${o.socks ? `<rect x="38.5" y="64" width="5" height="6" fill="${CREAM}"/>` : ''}<ellipse cx="43" cy="72" rx="6.5" ry="3.3" fill="${o.shoes}"/></g>
+    <rect x="17" y="35" width="11" height="18" rx="4" fill="#e45742"/>
+    ${o.bottom === 'skirt' ? `<path d="M27 50H45L52 65H21Z" fill="${RED}"/><path d="M21 65H52" stroke="${CREAM}" stroke-width="1.3"/>` : ''}
+    ${o.bottom === 'shorts' ? `<rect x="26" y="51" width="21" height="10" rx="2.5" fill="${o.pants}" stroke="${RED}" stroke-width=".8"/>` : ''}
+    ${o.bottom === 'trousers' ? `<rect x="26" y="50" width="20" height="9" rx="2.5" fill="${o.pants}" stroke="${RED}" stroke-width=".8"/>` : ''}
+    <path d="M27 36H45L46 54H26Z" fill="${o.top}" stroke="${RED}" stroke-width=".8" stroke-linejoin="round"/>
+    <path d="M32 36L36.5 42L41 36Z" fill="${CREAM}" stroke="${RED}" stroke-width=".6"/>
+    ${o.bow ? `<path d="M36.5 41L31.5 38.5V44ZM36.5 41L41.5 38.5V44Z" fill="#eb7f31" stroke="${RED}" stroke-width=".5"/>` : ''}
+    ${o.pocket ? `<rect x="39.5" y="43" width="5" height="5" fill="none" stroke="${RED}" stroke-width=".7"/>` : ''}
+    <g class="arm"><rect x="35" y="37" width="5" height="15" rx="2.5" fill="${SKIN}"/><rect x="34.5" y="37" width="6" height="6" rx="2.5" fill="${o.top}" stroke="${RED}" stroke-width=".6"/></g>
+    <circle cx="33" cy="22" r="15" fill="${o.hair}"/>
+    ${o.tuft ? `<path d="M27 11L30 3L34 10L38 2L40 10L46 7L45 14Z" fill="${o.hair}"/>` : ''}
+    <circle cx="37" cy="24" r="12" fill="${SKIN}"/>
+    <path d="M25 21Q36 7 49 20Q38 15 25 21Z" fill="${o.hair}"/>
+    <circle cx="42" cy="25" r="2.2" fill="${INK}"/><circle cx="42.7" cy="24.2" r=".8" fill="#fff"/>
+    <ellipse cx="45" cy="31" rx="2.3" ry="2.8" fill="${RED}"/>
+    <circle cx="40" cy="29" r="2.6" fill="#e45742" opacity=".55"/>
+    <path class="sweat" d="M16 16q-3 5 0 7q3-2 0-7z" fill="${CREAM}" stroke="${RED}" stroke-width="1"/>
+  </g></svg></div>`;
+
 const CHASE_SVG = `<div class="pair">
   <div class="ghwrap"><svg viewBox="0 0 74 84" width="64" height="74">
-    <ellipse cx="36" cy="80" rx="15" ry="2.6" fill="#3a1010" opacity=".13"/>
+    <ellipse cx="36" cy="80" rx="15" ry="2.6" fill="${INK}" opacity=".13"/>
     <g class="gfloat">
-      <path d="M10 14Q10 6 18 6H50L62 18V62Q58 72 53 62Q49 72 44 62Q39 72 35 62Q30 72 26 62Q21 72 16 62Q10 68 10 62Z" fill="#fffcf6" stroke="#972828" stroke-width="2" stroke-linejoin="round"/>
-      <path d="M50 6V18H62Z" fill="#fcad38" stroke="#972828" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M10 14Q10 6 18 6H50L62 18V62Q58 72 53 62Q49 72 44 62Q39 72 35 62Q30 72 26 62Q21 72 16 62Q10 68 10 62Z" fill="#fffcf6" stroke="${RED}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M50 6V18H62Z" fill="#fcad38" stroke="${RED}" stroke-width="2" stroke-linejoin="round"/>
       <path d="M18 52H54M18 58H44" stroke="#f4dcb9" stroke-width="2" stroke-linecap="round"/>
-      <ellipse cx="27" cy="30" rx="4" ry="5.5" fill="#3a1010"/><ellipse cx="43" cy="30" rx="4" ry="5.5" fill="#3a1010"/>
+      <ellipse cx="27" cy="30" rx="4" ry="5.5" fill="${INK}"/><ellipse cx="43" cy="30" rx="4" ry="5.5" fill="${INK}"/>
       <circle cx="28.3" cy="28" r="1.5" fill="#fff"/><circle cx="44.3" cy="28" r="1.5" fill="#fff"/>
       <circle cx="21" cy="38" r="3.2" fill="#e45742" opacity=".55"/><circle cx="49" cy="38" r="3.2" fill="#e45742" opacity=".55"/>
-      <path d="M29 39Q35 51 41 39Z" fill="#972828"/><path d="M32 44.5Q35 48 38 44.5Q35 43 32 44.5Z" fill="#e45742"/>
-      <path d="M62 30Q70 27 72 20M62 42Q71 42 73 36" stroke="#972828" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M29 39Q35 51 41 39Z" fill="${RED}"/><path d="M32 44.5Q35 48 38 44.5Q35 43 32 44.5Z" fill="#e45742"/>
+      <path d="M62 30Q70 27 72 20M62 42Q71 42 73 36" stroke="${RED}" stroke-width="2.2" fill="none" stroke-linecap="round"/>
     </g></svg></div>
-  <div class="stuwrap"><span class="say">ຊ່ວຍແດ່!</span>
-    <svg viewBox="0 0 64 84" width="56" height="74">
-    <ellipse cx="34" cy="80" rx="16" ry="3" fill="#3a1010" opacity=".13"/>
-    <g class="bodybob">
-      <g class="leg legA"><rect x="29" y="54" width="6" height="17" rx="3" fill="#ffd9a8"/><ellipse cx="34" cy="72" rx="6.5" ry="3.3" fill="#3a1010"/></g>
-      <g class="leg legB"><rect x="38" y="54" width="6" height="17" rx="3" fill="#ffd9a8"/><ellipse cx="43" cy="72" rx="6.5" ry="3.3" fill="#3a1010"/></g>
-      <rect x="17" y="35" width="11" height="17" rx="4" fill="#972828"/>
-      <path d="M27 36H45L50 58H23Z" fill="#fff6e8" stroke="#972828" stroke-width="1.4" stroke-linejoin="round"/>
-      <path d="M24.5 53H48.5" stroke="#e45742" stroke-width="2"/>
-      <g class="arm"><rect x="35" y="37" width="5" height="15" rx="2.5" fill="#ffd9a8"/></g>
-      <circle cx="33" cy="22" r="15" fill="#3a1010"/>
-      <circle cx="37" cy="24" r="12" fill="#ffd9a8"/>
-      <path d="M25 21Q36 7 49 20Q38 15 25 21Z" fill="#3a1010"/>
-      <path d="M22 10L16 7L17 14ZM22 10L26 4L28 11Z" fill="#fff6e8" stroke="#972828" stroke-width=".9" stroke-linejoin="round"/>
-      <circle cx="42" cy="25" r="1.8" fill="#3a1010"/>
-      <ellipse cx="45" cy="31" rx="2.3" ry="2.8" fill="#972828"/>
-      <circle cx="40" cy="29" r="2.6" fill="#e45742" opacity=".55"/>
-      <path class="sweat" d="M16 16q-3 5 0 7q3-2 0-7z" fill="#fff6e8" stroke="#972828" stroke-width="1"/>
-    </g></svg></div>
+  <div class="kids">
+    ${kid({w:46, h:60, sp:.34, ph:-.1, say:'ແລ່ນ!', hair:INK, tuft:true, top:CREAM, bottom:'shorts', pants:'#b87a52', socks:true, shoes:CREAM})}
+    ${kid({w:61, h:80, sp:.37, ph:-.2, say:'ຊ່ວຍແດ່!', hair:INK, tuft:true, top:'#ffeccb', pocket:true, bottom:'trousers', pants:'#f3c89a', legs:'#f3c89a', shoes:'#3a1010'})}
+    ${kid({w:55, h:72, sp:.35, ph:-.05, hair:'#6b2a1c', long:true, bow:true, top:CREAM, bottom:'skirt', socks:true, shoes:'#e45742'})}
+  </div>
 </div>`;
 
 window.addEventListener('hashchange', render);
