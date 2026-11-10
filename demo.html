@@ -86,7 +86,7 @@ td.num{font-variant-numeric:tabular-nums}
 const NAMES = ['ນາງ ແກ້ວມະນີ ວົງສະຫວັນ','ນາງ ດາລາ ສີທອງ','ນາງ ມະນີຈັນ ພົມມະລາດ','ນາງ ຈັນສຸດາ ແກ້ວປະເສີດ',
   'ນາງ ບົວຄຳ ສຸລິຍະ','ນາງ ພອນສະຫວັນ ໄຊຍະວົງ','ທ້າວ ສຸກສະຫວັນ ມະນີວົງ','ທ້າວ ທັດສະນະ ຄຳແສນ',
   'ທ້າວ ວິລະສັກ ພັນທະວົງ','ທ້າວ ໄຊຊະນະ ສີວິໄລ','ທ້າວ ອານຸສອນ ບຸນມາ','ທ້າວ ຄຳພອນ ແກ້ວວົງ'];
-const PINS = ['482913','175604','930271','648025','317789','702146','259830','814367','561092','093548','426781','738215'];
+const PINS = ['0642','0645','0656','0658','0670','0672','0675','0679','0685','0689','0690','0695'];
 const students = NAMES.map((n,i)=>({id:i,no:i+1,name:n,pin:PINS[i]}));
 
 let state;
@@ -120,12 +120,12 @@ function renderStudent(){
     S.pinOk&&myG&&!S.locked?h('button',{class:'b d',type:'button',onclick:()=>{delete S.m[me];S.msg='';render()}},'ອອກຈາກກຸ່ມ'):null));
 
   if(me!=null&&!S.pinOk){
-    const inp=h('input',{id:'pin-in',type:'password',inputmode:'numeric',maxlength:6,placeholder:'PIN 6 ຕົວເລກ',style:'width:150px',autocomplete:'off'});
+    const inp=h('input',{id:'pin-in',type:'password',inputmode:'numeric',maxlength:4,placeholder:'PIN 4 ຕົວເລກ',style:'width:130px',autocomplete:'off'});
     const go=()=>{ if(inp.value===students[me].pin){S.pinOk=true;S.msg=''}else{S.msg='PIN ບໍ່ຖືກຕ້ອງ'} render()};
     inp.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
     root.append(h('div',{class:'row'},h('b',{},'PIN:'),inp,h('button',{class:'b p',type:'button',onclick:go},'ຢືນຢັນ'),
-      h('span',{class:'mute'},'PIN ທີ່ໄດ້ຮັບທາງອີເມວ')));
-    root.append(h('div',{class:'note'},`ໃນແບບຈຳລອງ PIN ຂອງຊື່ນີ້ແມ່ນ ${students[me].pin} (ຂອງຈິງເຫັນສະເພາະເຈົ້າຂອງ)`));
+      h('span',{class:'mute'},'4 ຕົວທ້າຍຂອງລະຫັດນັກສຶກສາ')));
+    root.append(h('div',{class:'note'},`ໃນແບບຈຳລອງ PIN ຂອງຊື່ນີ້ (4 ຕົວທ້າຍຂອງລະຫັດ) ແມ່ນ ${students[me].pin} (ຂອງຈິງເຫັນສະເພາະເຈົ້າຂອງ)`));
   }
 
   const grid=h('div',{class:'grid'});
@@ -178,10 +178,10 @@ function renderAdmin(){
         h('select',{'aria-label':'ກຸ່ມຂອງ '+s.name,onchange:e=>{const v=e.target.value;if(v==='')delete S.m[s.id];else S.m[s.id]=+v;render()}},
           h('option',{value:''},'ບໍ່ມີກຸ່ມ'),
           Array.from({length:S.groups},(_,i)=>h('option',{value:i+1,selected:S.m[s.id]===i+1},'ກຸ່ມ '+(i+1)))))))));
-  const rows=students.map(s=>h('tr',{},h('td',{class:'num'},s.no),h('td',{},s.name),h('td',{class:'num'},s.pin),h('td',{},'name'+s.no+'@gmail.com')));
-  root.append(h('div',{class:'card',style:'margin-top:12px'},h('h2',{},'PIN ແລະ Gmail ຂອງນັກສຶກສາ'),
-    h('div',{class:'note'},'ແອດມິນດາວໂຫຼດເປັນ CSV ເພື່ອສົ່ງ PIN ທາງ Gmail ຄົນລະຄົນ · ຕາຕະລາງນີ້ເປັນຂໍ້ມູນປອມ'),
-    h('div',{class:'tablewrap'},h('table',{},h('thead',{},h('tr',{},['ເລກທີ','ຊື່','PIN','Gmail'].map(x=>h('th',{},x)))),h('tbody',{},rows)))));
+  const rows=students.map(s=>h('tr',{},h('td',{class:'num'},s.no),h('td',{},s.name),h('td',{class:'num'},'BI12241000'+s.pin.slice(0,0)+'··'+s.pin),h('td',{class:'num'},s.pin)));
+  root.append(h('div',{class:'card',style:'margin-top:12px'},h('h2',{},'PIN ຂອງນັກສຶກສາ'),
+    h('div',{class:'note'},'PIN ແມ່ນ 4 ຕົວທ້າຍຂອງລະຫັດນັກສຶກສາ ເພື່ອນບໍ່ຕ້ອງລໍຖ້າຮັບ PIN · ຕາຕະລາງນີ້ເປັນຂໍ້ມູນປອມ'),
+    h('div',{class:'tablewrap'},h('table',{},h('thead',{},h('tr',{},['ເລກທີ','ຊື່','ລະຫັດ (ຕົວຢ່າງ)','PIN'].map(x=>h('th',{},x)))),h('tbody',{},rows)))));
 }
 
 function render(){renderStudent();renderAdmin()}

@@ -204,7 +204,7 @@ function renderActivity(id) {
   app.append(h('div', {class:'row'}, h('b', {}, 'ເຈົ້າແມ່ນ:'), sel,
     mine && mypin && myGroup && !a.locked ? h('button', {class:'danger', onclick:() => rpc('leave_group', {p_activity:id, p_code:mine, p_pin:mypin})}, 'ອອກຈາກກຸ່ມ') : null));
   if (mine && !mypin) {
-    const pinInp = h('input', {type:'password', inputmode:'numeric', autocomplete:'off', placeholder:'PIN 6 ຕົວເລກ', style:'width:150px'});
+    const pinInp = h('input', {type:'password', inputmode:'numeric', autocomplete:'off', placeholder:'PIN 4 ຕົວເລກ', maxlength:4, style:'width:130px'});
     const verify = async () => {
       const r = await sb.rpc('verify_pin', {p_code: mine, p_pin: pinInp.value.trim()});
       if (r.data === true) { store.set('mypin', pinInp.value.trim()); toast = ''; }
@@ -213,7 +213,7 @@ function renderActivity(id) {
     };
     pinInp.addEventListener('keydown', e => { if (e.key === 'Enter') verify(); });
     app.append(h('div', {class:'row'}, h('b', {}, 'PIN:'), pinInp, h('button', {class:'primary', onclick:verify}, 'ຢືນຢັນ'),
-      h('span', {class:'mute'}, 'PIN ທີ່ໄດ້ຮັບທາງອີເມວ')));
+      h('span', {class:'mute'}, '4 ຕົວທ້າຍຂອງລະຫັດນັກສຶກສາ')));
   }
 
   const grid = h('div', {class:'grid'});
