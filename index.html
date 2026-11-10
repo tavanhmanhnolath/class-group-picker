@@ -297,7 +297,7 @@ function renderAdmin() {
   }
   const admin = async (fn, args) => {
     const r = await rpc(fn, {p_pin: pin, ...args});
-    if (r.error && /ລະຫັດແອດມິນ|รหัสแอดมิน/.test(r.error.message)) { try { sessionStorage.removeItem('pin'); } catch {} render(); }
+    if (r.error && /ລະຫັດແອດມິນ/.test(r.error.message)) { try { sessionStorage.removeItem('pin'); } catch {} render(); }
     return r;
   };
 
