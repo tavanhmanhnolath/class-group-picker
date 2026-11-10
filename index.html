@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="lo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ແບ່ງກຸ່ມ BF124</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mute:#667085;--line:#e3e7ee;--accent:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--me:#eaf1ff}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212c;--ink:#e8ecf3;--mute:#93a0b4;--line:#2a3342;--accent:#5b8cff;--me:#1d2a45}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans Lao',system-ui,sans-serif;line-height:1.5}
+main{max-width:960px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1.05rem;margin:0}
+.mute{color:var(--mute);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px}
+.card.me{border-color:var(--accent);background:var(--me)}
+.card.full{opacity:.65}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.count{font-size:.85rem;color:var(--mute)}.count.full{color:var(--bad);font-weight:600}
+ul{list-style:none;margin:0 0 8px;padding:0;min-height:24px}
+li{padding:2px 0;font-size:.92rem;display:flex;justify-content:space-between;gap:6px}
+li.self{font-weight:700;color:var(--accent)}
+button,select,input{font:inherit}
+button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.5;cursor:not-allowed}
+select,input{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px;min-height:40px;max-width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.banner{padding:10px 12px;border-radius:10px;margin-top:12px;font-size:.92rem}
+.banner.lock{background:#fff4e5;color:#8a4b00}.banner.err{background:#fde8e8;color:#9b1c1c}
+@media (prefers-color-scheme:dark){.banner.lock{background:#3a2a10;color:#ffd699}.banner.err{background:#3a1717;color:#ffb3b3}}
+a{color:var(--accent)}
+.nav{display:flex;justify-content:space-between;margin-bottom:12px;font-size:.9rem}
+.pool{margin-top:16px}.pool span{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:3px;font-size:.85rem;background:var(--card)}
+.tiny{min-height:30px;padding:2px 8px;font-size:.8rem}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+// ====== ໃສ່ຄ່າຈາກ Supabase > Project Settings > API ======
+const SUPABASE_URL = 'https://bnlyewxojqbpfuiakpqr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Do6cExWBminTmtHnzvLMKA_WhLFJTzf';
+// ==========================================================
+
+const app = document.getElementById('app');
+const h = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'class') e.className = v;
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+};
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch {} },
+  del(k){ try { localStorage.removeItem(k); } catch {} },
+};
+const sget = k => { try { return sessionStorage.getItem(k); } catch { return null; } };
+const sset = (k,v) => { try { sessionStorage.setItem(k,v); } catch {} };
+
+if (SUPABASE_URL.startsWith('PASTE')) {
+  app.append(h('div', {class:'banner err'}, 'ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ Supabase: ແກ້ SUPABASE_URL ແລະ SUPABASE_KEY ໃນໄຟລ໌ index.html'));
+  throw new Error('not configured');
+}
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let students = [], activities = [], members = [], channel = null, toast = '';
+const byCode = () => Object.fromEntries(students.map(s => [s.code, s]));
+const label = s => `${s.gender || ''} ${s.name}`.trim();
+const me = () => store.get('me');
+
+async function load() {
+  const [s, a, m] = await Promise.all([
+    sb.from('students').select('*').order('no'),
+    sb.from('activities').select('*').order('created_at', {ascending:false}),
+    sb.from('memberships').select('*'),
+  ]);
+  const err = s.error || a.error || m.error;
+  if (err) { toast = 'ໂຫຼດຂໍ້ມູນບໍ່ໄດ້: ' + err.message; }
+  students = s.data || []; activities = a.data || []; members = m.data || [];
+}
+async function rpc(fn, args) {
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) { toast = error.message; if (/PIN/.test(error.message)) store.del('mypin'); } else { toast = ''; }
+  await load(); render();
+  return { data, error };
+}
+
+function subscribe() {
+  if (channel) return;
+  let t;
+  const refresh = () => { clearTimeout(t); t = setTimeout(async () => { await load(); render(); }, 150); };
+  channel = sb.channel('live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'memberships'}, refresh)
+    .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, refresh)
+    .subscribe();
+}
+
+const route = () => location.hash.replace(/^#\/?/, '');
+
+function render() {
+  const r = route();
+  app.replaceChildren();
+  if (toast) app.append(h('div', {class:'banner err'}, toast));
+  if (r === 'admin') return renderAdmin();
+  if (r.startsWith('a/')) return renderActivity(r.slice(2));
+  return renderHome();
+}
+
+function renderHome() {
+  app.append(h('h1', {}, 'ແບ່ງກຸ່ມ BF124'), h('div', {class:'mute'}, 'ເລືອກກິດຈະກຳ'));
+  if (!activities.length) app.append(h('div', {class:'card', style:'margin-top:12px'}, 'ຍັງບໍ່ມີກິດຈະກຳ'));
+  for (const a of activities)
+    app.append(h('a', {href:'#/a/' + a.id, style:'text-decoration:none;color:inherit'},
+      h('div', {class:'card', style:'margin-top:12px'},
+        h('h2', {}, a.title, a.locked ? ' 🔒' : ''),
+        h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ`))));
+  app.append(h('p', {class:'mute'}, h('a', {href:'#/admin'}, 'ແອດມິນ')));
+}
+
+function renderActivity(id) {
+  const a = activities.find(x => x.id === id);
+  app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')));
+  if (!a) return app.append(h('div', {class:'card'}, 'ບໍ່ພົບກິດຈະກຳ'));
+  const codes = byCode();
+  const mine = me();
+  const ms = members.filter(m => m.activity_id === id);
+  const myGroup = ms.find(m => m.student_code === mine)?.group_no;
+
+  app.append(h('h1', {}, a.title), h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ`));
+  if (a.locked) app.append(h('div', {class:'banner lock'}, '🔒 ກິດຈະກຳນີ້ຖືກລ໋ອກແລ້ວ ປ່ຽນກຸ່ມບໍ່ໄດ້'));
+
+  // ເລືອກຊື່ຕົນເອງ
+  const mypin = store.get('mypin');
+  const sel = h('select', {onchange: e => { store.del('mypin'); e.target.value ? store.set('me', e.target.value) : store.del('me'); toast = ''; render(); }},
+    h('option', {value:''}, '— ເລືອກຊື່ຂອງເຈົ້າ —'),
+    students.map(s => h('option', {value:s.code, selected: s.code === mine}, `${s.no}. ${label(s)}`)));
+  app.append(h('div', {class:'row'}, h('b', {}, 'ເຈົ້າແມ່ນ:'), sel,
+    mine && mypin && myGroup && !a.locked ? h('button', {class:'danger', onclick:() => rpc('leave_group', {p_activity:id, p_code:mine, p_pin:mypin})}, 'ອອກຈາກກຸ່ມ') : null));
+  if (mine && !mypin) {
+    const pinInp = h('input', {type:'password', inputmode:'numeric', autocomplete:'off', placeholder:'PIN 6 ຕົວເລກ', style:'width:150px'});
+    const verify = async () => {
+      const r = await sb.rpc('verify_pin', {p_code: mine, p_pin: pinInp.value.trim()});
+      if (r.data === true) { store.set('mypin', pinInp.value.trim()); toast = ''; }
+      else toast = r.error ? r.error.message : 'PIN ບໍ່ຖືກຕ້ອງ';
+      render();
+    };
+    pinInp.addEventListener('keydown', e => { if (e.key === 'Enter') verify(); });
+    app.append(h('div', {class:'row'}, h('b', {}, 'PIN:'), pinInp, h('button', {class:'primary', onclick:verify}, 'ຢືນຢັນ'),
+      h('span', {class:'mute'}, 'PIN ທີ່ໄດ້ຮັບທາງອີເມວ')));
+  }
+
+  const grid = h('div', {class:'grid'});
+  for (let g = 1; g <= a.group_count; g++) {
+    const gm = ms.filter(m => m.group_no === g);
+    const isFull = gm.length >= a.group_size;
+    const isMine = myGroup === g;
+    const btn = h('button', {
+      class: isMine ? '' : 'primary',
+      disabled: !mine || !mypin || a.locked || isMine || isFull,
+      onclick: () => rpc('join_group', {p_activity:id, p_code:mine, p_pin:mypin, p_group:g}),
+    }, isMine ? 'ເຈົ້າຢູ່ກຸ່ມນີ້' : isFull ? 'ເຕັມ' : myGroup ? 'ຍ້າຍມາກຸ່ມນີ້' : 'ເຂົ້າກຸ່ມນີ້');
+    grid.append(h('div', {class:'card' + (isMine ? ' me' : '') + (isFull && !isMine ? ' full' : '')},
+      h('div', {class:'head'}, h('h2', {}, 'ກຸ່ມ ' + g), h('span', {class:'count' + (isFull ? ' full' : '')}, `${gm.length}/${a.group_size}`)),
+      h('ul', {}, gm.map(m => h('li', {class: m.student_code === mine ? 'self' : ''}, codes[m.student_code] ? label(codes[m.student_code]) : m.student_code))),
+      btn));
+  }
+  app.append(grid);
+
+  const assigned = new Set(ms.map(m => m.student_code));
+  const left = students.filter(s => !assigned.has(s.code));
+  app.append(h('div', {class:'pool'}, h('b', {}, `ຍັງບໍ່ໄດ້ເລືອກກຸ່ມ (${left.length})`),
+    h('div', {}, left.map(s => h('span', {}, label(s))))));
+}
+
+function renderAdmin() {
+  app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')), h('h1', {}, 'ແອດມິນ'));
+  let pin = sget('pin');
+  if (!pin) {
+    const inp = h('input', {type:'password', placeholder:'ລະຫັດແອດມິນ'});
+    const go = async () => {
+      const probe = await sb.rpc('admin_set_lock', {p_pin: inp.value, p_activity: '00000000-0000-0000-0000-000000000000', p_locked: false});
+      if (probe.error) { toast = probe.error.message; return render(); }
+      sset('pin', inp.value); toast = ''; render();
+    };
+    return app.append(h('div', {class:'row'}, inp, h('button', {class:'primary', onclick:go}, 'ເຂົ້າສູ່ລະບົບ')));
+  }
+  const admin = async (fn, args) => {
+    const r = await rpc(fn, {p_pin: pin, ...args});
+    if (r.error && /ລະຫັດ/.test(r.error.message)) { try { sessionStorage.removeItem('pin'); } catch {} render(); }
+    return r;
+  };
+
+  const title = h('input', {placeholder:'ຊື່ກິດຈະກຳ / ວິຊາ'});
+  const cnt = h('input', {type:'number', min:1, max:50, placeholder:'ຈຳນວນກຸ່ມ', style:'width:110px'});
+  const size = h('input', {type:'number', min:1, max:100, placeholder:'ຄົນ/ກຸ່ມ', style:'width:100px'});
+  app.append(h('div', {class:'card'}, h('h2', {}, 'ສ້າງກິດຈະກຳໃໝ່'),
+    h('div', {class:'row'}, title, cnt, size,
+      h('button', {class:'primary', onclick: async () => {
+        if (!title.value.trim() || !cnt.value || !size.value) { toast = 'ກະລຸນາໃສ່ຂໍ້ມູນໃຫ້ຄົບ'; return render(); }
+        const r = await admin('admin_create_activity', {p_title: title.value.trim(), p_count: +cnt.value, p_size: +size.value});
+        if (r.data) location.hash = '#/admin';
+      }}, 'ສ້າງ')),
+    h('div', {class:'mute'}, `ນັກສຶກສາທັງໝົດ ${students.length} ຄົນ`),
+    h('div', {class:'row'}, h('button', {onclick: async () => {
+      const r = await sb.rpc('admin_get_pins', {p_pin: pin});
+      if (r.error) { toast = r.error.message; return render(); }
+      const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      const rows = [['ເລກທີ','ລະຫັດນັກສຶກສາ','ຊື່','PIN','Gmail']].concat(r.data.map(x => [x.no, x.code, `${x.gender || ''} ${x.name}`.trim(), x.pin, '']));
+      const u = URL.createObjectURL(new Blob(['﻿' + rows.map(x => x.map(q).join(',')).join('\n')], {type:'text/csv;charset=utf-8'}));
+      h('a', {href:u, download:'student_pins.csv'}).click();
+      setTimeout(() => URL.revokeObjectURL(u), 1000);
+    }}, 'ດາວໂຫຼດ PIN ນັກສຶກສາ (CSV)'))));
+
+  const codes = byCode();
+  for (const a of activities) {
+    const ms = members.filter(m => m.activity_id === a.id);
+    const link = location.href.split('#')[0] + '#/a/' + a.id;
+    const left = students.length - ms.length;
+    const box = h('div', {class:'card', style:'margin-top:12px'},
+      h('h2', {}, a.title, a.locked ? ' 🔒' : ''),
+      h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ · ເລືອກແລ້ວ ${ms.length}/${students.length}`),
+      h('div', {class:'row'},
+        h('button', {onclick: async () => { try { await navigator.clipboard.writeText(link); toast=''; } catch { prompt('ລິ້ງ', link); } }}, 'ຄັດລອກລິ້ງ'),
+        h('button', {onclick:() => admin('admin_set_lock', {p_activity:a.id, p_locked:!a.locked})}, a.locked ? 'ປົດລ໋ອກ' : 'ລ໋ອກ'),
+        h('button', {disabled: !left || a.locked, onclick: () => confirm(`ສຸ່ມຈັດຄົນທີ່ເຫຼືອ ${left} ຄົນ?`) && admin('admin_random_fill', {p_activity:a.id})}, `ສຸ່ມຄົນທີ່ເຫຼືອ (${left})`),
+        h('button', {onclick:() => exportCsv(a, ms, codes)}, 'ດາວໂຫຼດ CSV'),
+        h('button', {class:'danger', onclick:() => confirm('ລຶບກິດຈະກຳນີ້?') && admin('admin_delete_activity', {p_activity:a.id})}, 'ລຶບ')));
+    const det = h('details', {}, h('summary', {}, 'ຍ້າຍ/ຖອດສະມາຊິກ'));
+    for (const s of students) {
+      const cur = ms.find(m => m.student_code === s.code)?.group_no ?? '';
+      const opts = [h('option', {value:''}, 'ບໍ່ມີກຸ່ມ')];
+      for (let g = 1; g <= a.group_count; g++) opts.push(h('option', {value:g, selected: cur === g}, 'ກຸ່ມ ' + g));
+      det.append(h('div', {class:'row', style:'margin:2px 0'},
+        h('span', {style:'flex:1;min-width:160px'}, `${s.no}. ${label(s)}`),
+        h('select', {onchange: e => admin('admin_move', {p_activity:a.id, p_code:s.code, p_group: e.target.value ? +e.target.value : null})}, opts)));
+    }
+    box.append(det);
+    app.append(box);
+  }
+}
+
+function exportCsv(a, ms, codes) {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const gOf = Object.fromEntries(ms.map(m => [m.student_code, m.group_no]));
+  const rows = [['ກຸ່ມ','ເລກທີ','ລະຫັດນັກສຶກສາ','ຊື່']]
+    .concat(students.slice().sort((x,y) => (gOf[x.code] ?? 999) - (gOf[y.code] ?? 999) || x.no - y.no)
+    .map(s => [gOf[s.code] ?? 'ຍັງບໍ່ມີກຸ່ມ', s.no, s.code, label(s)]));
+  const blob = new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\n')], {type:'text/csv;charset=utf-8'});
+  const u = URL.createObjectURL(blob);
+  h('a', {href:u, download:`groups_${a.title}.csv`}).click();
+  setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+
+window.addEventListener('hashchange', render);
+load().then(() => { render(); subscribe(); });
+</script>
+</body>
+</html>
