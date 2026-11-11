@@ -143,6 +143,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let students = [], allStudents = [], activities = [], members = [], notes = [], channel = null, toast = '';
 const noteDraft = {}; // unsent note text per group, kept across live re-renders
 const byCode = () => Object.fromEntries(students.map(s => [s.code, s]));
+// each group can have its own capacity (admin override); otherwise the activity's default applies
+const capOf = (a, g) => +((a.group_sizes || {})[g]) || a.group_size;
+const diff = a => Object.keys(a.group_sizes || {}).length ? ' (ບາງກຸ່ມຕ່າງກັນ)' : '';
 const label = s => `${s.gender || ''} ${s.name}`.trim();
 const me = () => store.get('me');
 
@@ -244,7 +247,7 @@ function renderHome() {
     app.append(h('a', {href:'#/a/' + a.id, style:'text-decoration:none;color:inherit'},
       h('div', {class:'card', style:'margin-top:12px'},
         h('h2', {}, a.title, a.locked ? ' 🔒' : ''),
-        h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ`))));
+        h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ${diff(a)}`))));
   app.append(h('p', {class:'mute'}, h('a', {href:'#/admin'}, 'ແອດມິນ')));
 }
 
@@ -255,9 +258,11 @@ function renderActivity(id) {
   const mine = codes[me()] ? me() : null; // a name that was removed from the roster is treated as "not chosen"
   const ms = members.filter(m => m.activity_id === id);
   const myGroup = ms.find(m => m.student_code === mine)?.group_no;
+  const lockedG = a.locked_groups || [];            // groups the admin has locked one by one
+  const myLocked = !!myGroup && lockedG.includes(myGroup);
 
   app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')),
-    hero(a.title, `${a.group_count} ກຸ່ມ · ກຸ່ມລະ ${a.group_size} ຄົນ`));
+    hero(a.title, `${a.group_count} ກຸ່ມ · ກຸ່ມລະ ${a.group_size} ຄົນ${diff(a)}`));
   if (a.locked) app.append(h('div', {class:'banner lock'}, '🔒 ກິດຈະກຳນີ້ຖືກລ໋ອກແລ້ວ ປ່ຽນກຸ່ມບໍ່ໄດ້'));
 
   // ເລືອກຊື່ຕົນເອງ
@@ -266,7 +271,7 @@ function renderActivity(id) {
     h('option', {value:''}, '— ເລືອກຊື່ຂອງເຈົ້າ —'),
     students.map(s => h('option', {value:s.code, selected: s.code === mine}, `${s.no}. ${label(s)}`)));
   app.append(h('div', {class:'row'}, h('b', {}, 'ເຈົ້າແມ່ນ:'), sel,
-    mine && mypin && myGroup && !a.locked ? h('button', {class:'danger', onclick:() => rpc('leave_group', {p_activity:id, p_code:mine, p_pin:mypin})}, 'ອອກຈາກກຸ່ມ') : null));
+    mine && mypin && myGroup && !a.locked && !myLocked ? h('button', {class:'danger', onclick:() => rpc('leave_group', {p_activity:id, p_code:mine, p_pin:mypin})}, 'ອອກຈາກກຸ່ມ') : null));
   if (mine && !mypin) {
     const pinInp = h('input', {type:'password', inputmode:'numeric', autocomplete:'off', placeholder:'PIN 4 ຕົວເລກ', maxlength:4, style:'width:130px'});
     const verify = async () => {
@@ -284,19 +289,23 @@ function renderActivity(id) {
   const grid = h('div', {class:'grid'});
   for (let g = 1; g <= a.group_count; g++) {
     const gm = ms.filter(m => m.group_no === g);
-    const isFull = gm.length >= a.group_size;
+    const cap = capOf(a, g);
+    const isFull = gm.length >= cap;
     const isMine = myGroup === g;
+    const isLockedG = lockedG.includes(g);
     const btn = h('button', {
       class: isMine ? '' : 'primary',
-      disabled: !mine || !mypin || a.locked || isMine || isFull,
+      disabled: !mine || !mypin || a.locked || isMine || isFull || isLockedG || myLocked,
       onclick: () => rpc('join_group', {p_activity:id, p_code:mine, p_pin:mypin, p_group:g}),
-    }, isMine ? 'ເຈົ້າຢູ່ກຸ່ມນີ້ ♡' : isFull ? 'ເຕັມແລ້ວ' : myGroup ? 'ຍ້າຍມາກຸ່ມນີ້' : 'ເຂົ້າກຸ່ມນີ້');
-    const dots = a.group_size <= 8
-      ? h('span', {class:'dots'}, Array.from({length:a.group_size}, (_, i) => h('i', {class: i < gm.length ? 'on' : ''})))
+    }, isMine ? 'ເຈົ້າຢູ່ກຸ່ມນີ້ ♡' : isLockedG ? 'ກຸ່ມຖືກລ໋ອກ 🔒' : myLocked ? 'ກຸ່ມຂອງເຈົ້າຖືກລ໋ອກ' : isFull ? 'ເຕັມແລ້ວ' : myGroup ? 'ຍ້າຍມາກຸ່ມນີ້' : 'ເຂົ້າກຸ່ມນີ້');
+    const dots = cap <= 8
+      ? h('span', {class:'dots'}, Array.from({length:cap}, (_, i) => h('i', {class: i < gm.length ? 'on' : ''})))
       : null;
     grid.append(h('div', {class:'card g' + ((g - 1) % 4 + 1) + (isMine ? ' me' : '') + (isFull && !isMine ? ' full' : '')},
-      h('div', {class:'head'}, h('div', {class:'gt'}, h('span', {class:'badge'}, g), h('h2', {}, 'ກຸ່ມ ' + g)),
-        h('span', {class:'cnt' + (isFull ? ' full' : '')}, dots, `${gm.length}/${a.group_size}`)),
+      h('div', {class:'head'}, h('div', {class:'gt'}, h('span', {class:'badge'}, g), h('h2', {}, 'ກຸ່ມ ' + g + (isLockedG ? ' 🔒' : '')),
+        adminPin ? h('button', {class:'pen', style:'margin-left:2px', title: isLockedG ? 'ປົດລ໋ອກກຸ່ມນີ້' : 'ລ໋ອກກຸ່ມນີ້', 'aria-label': isLockedG ? 'ປົດລ໋ອກກຸ່ມນີ້' : 'ລ໋ອກກຸ່ມນີ້',
+          onclick: () => rpc('admin_set_group_lock', {p_pin:adminPin, p_activity:id, p_group:g, p_locked:!isLockedG})}, isLockedG ? '🔓' : '🔒') : null),
+        h('span', {class:'cnt' + (isFull ? ' full' : '')}, dots, `${gm.length}/${cap}`)),
       h('ul', {}, gm.length
         ? gm.map(m => { const st = codes[m.student_code];
             return h('li', {class: m.student_code === mine ? 'self' : ''}, h('span', {class:'av'}, st ? initial(st) : '?'), st ? label(st) : m.student_code); })
@@ -511,7 +520,7 @@ function renderAdmin() {
     const left = students.length - ms.length;
     const box = h('div', {class:'card', style:'margin-top:12px'},
       h('h2', {}, a.title, a.locked ? ' 🔒' : ''),
-      h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ · ເລືອກແລ້ວ ${ms.length}/${students.length}`),
+      h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ${diff(a)} · ເລືອກແລ້ວ ${ms.length}/${students.length}`),
       h('div', {class:'row'},
         h('button', {onclick: async () => { try { await navigator.clipboard.writeText(link); toast=''; } catch { showLink(link); } }}, 'ຄັດລອກລິ້ງ'),
         h('button', {onclick:() => admin('admin_set_lock', {p_activity:a.id, p_locked:!a.locked})}, a.locked ? 'ປົດລ໋ອກ' : 'ລ໋ອກ'),
@@ -534,6 +543,32 @@ function renderAdmin() {
           if (!r.error) { delete drafts[a.id]; render(); }
         }}, 'ບັນທຶກ')),
       h('div', {class:'mute'}, 'ຫຼຸດຈຳນວນກຸ່ມ: ຄົນໃນກຸ່ມທີ່ຖືກລຶບຈະຖືກຖອດອອກ · ຫຼຸດຄົນຕໍ່ກຸ່ມ: ຕ້ອງຍ້າຍຄົນທີ່ເກີນອອກກ່ອນ')));
+    const lg = a.locked_groups || [];
+    dr.caps ||= {};
+    box.append(h('details', {open: dr.lockOpen ? '' : null, ontoggle: e => { dr.lockOpen = e.target.open; }},
+      h('summary', {}, `ຕັ້ງຄ່າລາຍກຸ່ມ (ລ໋ອກ / ຈຳນວນຄົນ) · ລ໋ອກ ${lg.length}/${a.group_count}`),
+      Array.from({length:a.group_count}, (_, i) => i + 1).map(g => {
+        const custom = !!(a.group_sizes || {})[g];
+        return h('div', {class:'row', style:'margin:4px 0'},
+          h('button', {class: lg.includes(g) ? 'primary' : '', style:'width:104px;min-height:36px;padding:4px 10px',
+            onclick: () => admin('admin_set_group_lock', {p_activity:a.id, p_group:g, p_locked:!lg.includes(g)})},
+            (lg.includes(g) ? '🔒 ' : '🔓 ') + 'ກຸ່ມ ' + g),
+          h('span', {class:'mute'}, 'ເຕັມ'),
+          h('input', {type:'number', min:1, max:100, value: dr.caps[g] ?? capOf(a, g), style:'width:76px;min-height:36px', 'aria-label':`ຈຳນວນຄົນກຸ່ມ ${g}`,
+            oninput: e => { dr.caps[g] = e.target.value; }}),
+          h('span', {class:'mute'}, 'ຄົນ'),
+          h('button', {style:'min-height:36px;padding:4px 14px', onclick: async () => {
+            const v = +(dr.caps[g] ?? capOf(a, g));
+            if (!(v >= 1 && v <= 100)) { toast = 'ຈຳນວນຄົນ 1-100'; return render(); }
+            const r = await admin('admin_set_group_size', {p_activity:a.id, p_group:g, p_size:v});
+            if (!r.error) { delete dr.caps[g]; render(); }
+          }}, 'ບັນທຶກ'),
+          custom ? h('button', {style:'min-height:36px;padding:4px 12px', title:'ກັບໄປໃຊ້ຄ່າກາງຂອງກິດຈະກຳ', onclick: async () => {
+            const r = await admin('admin_set_group_size', {p_activity:a.id, p_group:g, p_size:null});
+            if (!r.error) { delete dr.caps[g]; render(); }
+          }}, `ໃຊ້ຄ່າກາງ (${a.group_size})`) : null);
+      }),
+      h('div', {class:'mute'}, 'ກຸ່ມທີ່ລ໋ອກ: ບໍ່ຮັບຄົນເພີ່ມ ແລະ ຄົນໃນກຸ່ມຍ້າຍອອກເອງບໍ່ໄດ້ (ແອດມິນຍັງຍ້າຍໄດ້ ໂນ້ດຍັງແກ້ໄດ້) · ຈຳນວນຄົນເຕັມຂອງແຕ່ລະກຸ່ມປັບໄດ້ ຖ້າບໍ່ປັບຈະໃຊ້ຄ່າກາງ')));
     const det = h('details', {}, h('summary', {}, 'ຍ້າຍ/ຖອດສະມາຊິກ'));
     for (const s of students) {
       const cur = ms.find(m => m.student_code === s.code)?.group_no ?? '';
