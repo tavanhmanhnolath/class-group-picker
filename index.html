@@ -41,10 +41,12 @@ h2{font-family:var(--display);font-size:1.05rem;margin:0}
 .cnt.full{color:var(--bad);font-weight:600}
 .dots{display:inline-flex;gap:3px}.dots i{width:9px;height:9px;border-radius:50%;border:2px solid var(--gc,var(--c3));display:block}
 .dots i.on{background:var(--gc,var(--c3))}
-.note{margin:0 0 10px;padding:9px 10px;border-radius:14px;background:color-mix(in srgb,var(--gc,var(--c3)) 14%,var(--card));border:1.5px dashed var(--gc,var(--c3))}
-.nt{font-weight:600;font-size:.82rem;margin-bottom:4px}
-.nbody{font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
-.nby{font-size:.75rem;margin-top:3px}
+.note{margin:0 0 10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.note.open{display:block;padding:9px 10px;border-radius:14px;background:color-mix(in srgb,var(--gc,var(--c3)) 12%,var(--card))}
+.nline{flex:1;min-width:0;font-size:.88rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mute)}
+.nby{font-size:.75rem}
+.pen{min-height:30px!important;width:30px;padding:0!important;border-radius:50%!important;font-size:.95rem;line-height:1;color:var(--mute);flex:none;margin-left:auto}
+.nmsg{flex-basis:100%;font-size:.8rem;color:var(--mute)}.nmsg.bad{color:var(--bad);font-weight:600}
 .note textarea{width:100%;box-sizing:border-box;font:inherit;font-size:.9rem;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:8px 10px;resize:vertical}
 ul{list-style:none;margin:0 0 10px;padding:0;min-height:30px}
 li{padding:3px 0;font-size:.92rem;display:flex;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere}
@@ -305,30 +307,37 @@ function renderActivity(id) {
 }
 
 // a small message board per group: everyone reads it, only that group's members (and the admin) write
+const noteOpen = {}, noteMsg = {};
 function noteBox(id, g, role, mine, mypin, adminPin) {
   const saved = notes.find(n => n.activity_id === id && n.group_no === g);
-  const box = h('div', {class:'note'}, h('div', {class:'nt'}, '📝 ໂນ້ດຂອງກຸ່ມ'));
-  if (!role) {
-    box.append(saved ? h('div', {class:'nbody'}, saved.note) : h('div', {class:'mute'}, 'ຍັງບໍ່ມີໂນ້ດ'));
-    if (saved) box.append(h('div', {class:'mute nby'}, '— ' + saved.updated_by));
-    return box;
+  const k = id + ':' + g, msg = noteMsg[k];
+  const msgEl = msg ? h('div', {class:'nmsg' + (msg.bad ? ' bad' : '')}, msg.t) : null;
+  if (!noteOpen[k]) {
+    if (!saved && !role && !msg) return null;
+    return h('div', {class:'note'},
+      saved ? h('div', {class:'nline'}, '📝 ' + saved.note, h('span', {class:'mute nby'}, ' — ' + saved.updated_by)) : null,
+      role ? h('button', {class:'pen', title:'ຂຽນໂນ້ດ', 'aria-label':'ຂຽນໂນ້ດຂອງກຸ່ມ', onclick: () => {
+        noteOpen[k] = true; delete noteMsg[k]; render();
+        setTimeout(() => app.querySelector('textarea[data-k="' + k + '"]')?.focus());
+      }}, '✎') : null,
+      msgEl);
   }
-  const k = id + ':' + g, cur = k in noteDraft ? noteDraft[k] : (saved ? saved.note : '');
   const ta = h('textarea', {rows:3, maxlength:300, 'data-k':k, placeholder:'ຂຽນບອກໝູ່ ເຊັ່ນ ກຸ່ມເຮົາເລືອກບົດທີ 3 ແລ້ວ ♡',
     oninput: e => { noteDraft[k] = e.target.value; }});
-  ta.value = cur;
-  const dirty = k in noteDraft && noteDraft[k] !== (saved ? saved.note : '');
-  box.append(ta, h('div', {class:'row', style:'margin:6px 0 0'},
-    h('button', {class:'primary', style:'width:auto;min-height:36px;padding:4px 14px', disabled: !dirty, onclick: async () => {
-      const text = noteDraft[k] ?? '';
+  ta.value = k in noteDraft ? noteDraft[k] : (saved ? saved.note : '');
+  const close = () => { noteOpen[k] = false; delete noteDraft[k]; render(); };
+  return h('div', {class:'note open'}, ta, h('div', {class:'row', style:'margin:6px 0 0'},
+    h('button', {class:'primary', style:'width:auto;min-height:36px;padding:4px 16px', onclick: async () => {
+      const text = k in noteDraft ? noteDraft[k] : (saved ? saved.note : '');
       const r = role === 'admin'
         ? await rpc('admin_set_group_note', {p_pin:adminPin, p_activity:id, p_group:g, p_note:text})
         : await rpc('set_group_note', {p_activity:id, p_code:mine, p_pin:mypin, p_group:g, p_note:text});
-      if (!r.error) { delete noteDraft[k]; render(); }
-    }}, 'ບັນທຶກໂນ້ດ'),
-    h('span', {class:'mute'}, role === 'admin' ? 'ແອດມິນ' : 'ສະເພາະຄົນໃນກຸ່ມ')),
-    saved ? h('div', {class:'mute nby'}, '— ' + saved.updated_by) : null);
-  return box;
+      if (r.error) { noteMsg[k] = {t: r.error.message, bad: true}; }
+      else { noteOpen[k] = false; delete noteDraft[k]; noteMsg[k] = {t:'✓ ບັນທຶກແລ້ວ'}; setTimeout(() => { delete noteMsg[k]; render(); }, 2500); }
+      render();
+    }}, 'ບັນທຶກ'),
+    h('button', {style:'min-height:36px;padding:4px 14px', onclick:close}, 'ຍົກເລີກ')),
+    msgEl);
 }
 
 const drafts = {};
