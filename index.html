@@ -47,6 +47,7 @@ h2{font-family:var(--display);font-size:1.05rem;margin:0}
 .dlg{background:var(--card);border:2px solid var(--line);border-radius:22px;padding:18px;width:100%;max-width:340px;box-shadow:0 20px 40px -20px #000}
 .dlg input{width:100%;box-sizing:border-box;text-align:center;letter-spacing:.3em;font-size:1.2rem}
 .ncount{text-align:right;font-size:.75rem;color:var(--mute);margin-top:2px;font-variant-numeric:tabular-nums}
+.hist{padding:6px 0;border-top:1px solid var(--line);font-size:.9rem;overflow-wrap:anywhere}
 .nline{flex:1;min-width:0;font-size:.88rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mute)}
 .nby{font-size:.75rem}
 .pen{min-height:30px!important;width:30px;padding:0!important;border-radius:50%!important;font-size:.95rem;line-height:1;color:var(--mute);flex:none;margin-left:auto}
@@ -373,7 +374,7 @@ function noteBox(id, g, role, mine, mypin, adminPin) {
     msgEl);
 }
 
-const drafts = {};
+const drafts = {}, hist = {open:false, loaded:false, rows:[]};
 function renderAdmin() {
   app.append(h('div', {class:'nav'}, h('a', {href:'#/'}, '← ກັບຄືນ')), hero('ແອດມິນ', 'ຈັດການກິດຈະກຳແບ່ງກຸ່ມ'));
   let pin = sget('pin');
@@ -462,6 +463,25 @@ function renderAdmin() {
       removedList.map(s => h('div', {class:'row', style:'margin:2px 0'},
         h('span', {style:'flex:1;min-width:160px;color:var(--mute)'}, `${s.no}. ${label(s)}`),
         h('button', {onclick: () => adminStu('admin_set_student_active', {p_code:s.code, p_active:true})}, 'ຄືນຊື່')))) : null));
+
+  // note history: who edited which group's note and when (only the admin can read this)
+  const loadHist = async () => {
+    const r = await sb.rpc('admin_get_note_history', {p_pin: pin});
+    if (r.error) { toast = r.error.message; hist.rows = []; } else { toast = ''; hist.rows = r.data; }
+    hist.loaded = true; skipRestore = true; render();
+  };
+  if (hist.open && !hist.loaded) loadHist();
+  const fmt = t => new Date(t).toLocaleString('lo-LA', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  app.append(h('details', {class:'card', style:'margin-top:12px', open: hist.open ? '' : null, ontoggle: e => {
+      if (e.target.open === hist.open) return; // re-render re-applies `open` and fires this again
+      hist.open = e.target.open; if (hist.open) { hist.loaded = false; loadHist(); } }},
+    h('summary', {}, '📜 ປະຫວັດໂນ້ດ (ໃຜແກ້ ເວລາໃດ)'),
+    !hist.loaded ? h('div', {class:'mute'}, 'ກຳລັງໂຫຼດ...') :
+    !hist.rows.length ? h('div', {class:'mute'}, 'ຍັງບໍ່ມີປະຫວັດ') :
+    h('div', {}, h('div', {class:'row'}, h('button', {onclick: () => { hist.loaded = false; loadHist(); }}, 'ໂຫຼດໃໝ່')),
+      hist.rows.map(x => h('div', {class:'hist'},
+        h('div', {class:'mute'}, `${fmt(x.made_at)} · ${x.title || '(ກິດຈະກຳຖືກລຶບແລ້ວ)'} · ກຸ່ມ ${x.grp}`),
+        h('div', {}, h('b', {}, x.author), x.note_text ? ': ' + x.note_text : h('i', {class:'mute'}, ' ລຶບໂນ້ດ')))))));
 
   const codes = byCode();
   for (const a of activities) {
