@@ -45,6 +45,7 @@ h2{font-family:var(--display);font-size:1.05rem;margin:0}
 .note.open{display:block;padding:9px 10px;border-radius:14px;background:color-mix(in srgb,var(--gc,var(--c3)) 12%,var(--card))}
 .ov{position:fixed;inset:0;background:rgba(20,5,5,.6);display:grid;place-items:center;z-index:50;padding:16px}
 .dlg{background:var(--card);border:2px solid var(--line);border-radius:22px;padding:18px;width:100%;max-width:340px;box-shadow:0 20px 40px -20px #000}
+.dlg .danger-fill{background:var(--bad);border-color:var(--bad);color:var(--card)}
 .dlg input{width:100%;box-sizing:border-box;text-align:center;letter-spacing:.3em;font-size:1.2rem}
 .ncount{text-align:right;font-size:.75rem;color:var(--mute);margin-top:2px;font-variant-numeric:tabular-nums}
 .hist{padding:6px 0;border-top:1px solid var(--line);font-size:.9rem;overflow-wrap:anywhere}
@@ -311,6 +312,26 @@ function renderActivity(id) {
     h('div', {}, left.map(s => h('span', {}, h('i', {class:'av'}, initial(s)), label(s))))));
 }
 
+// centred confirm box (replaces the browser's confirm()/prompt() pop-ups)
+function ask(msg, okLabel = 'ຕົກລົງ', danger = false) {
+  return new Promise(res => {
+    const done = v => { ov.remove(); document.removeEventListener('keydown', onKey); res(v); };
+    const ok = h('button', {class: danger ? 'primary danger-fill' : 'primary', style:'width:auto', onclick: () => done(true)}, okLabel);
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    const ov = h('div', {class:'ov', role:'alertdialog', 'aria-modal':'true', onclick: e => { if (e.target === ov) done(false); }},
+      h('div', {class:'dlg'}, h('div', {style:'margin-bottom:12px;line-height:1.5'}, msg),
+        h('div', {class:'row', style:'margin:0;justify-content:flex-end'}, h('button', {onclick: () => done(false)}, 'ຍົກເລີກ'), ok)));
+    document.body.append(ov); document.addEventListener('keydown', onKey); ok.focus();
+  });
+}
+function showLink(link) {
+  const inp = h('input', {value: link, readonly:'', 'aria-label':'ລິ້ງ', style:'width:100%;box-sizing:border-box'});
+  const ov = h('div', {class:'ov', onclick: e => { if (e.target === ov) ov.remove(); }},
+    h('div', {class:'dlg'}, h('div', {style:'margin-bottom:8px'}, 'ຄັດລອກລິ້ງນີ້:'), inp,
+      h('div', {class:'row', style:'margin:10px 0 0;justify-content:flex-end'}, h('button', {class:'primary', style:'width:auto', onclick: () => ov.remove()}, 'ປິດ'))));
+  document.body.append(ov); inp.focus(); inp.select();
+}
+
 // centred dialog asking the person to re-enter their PIN before a note is saved
 function pinDialog(onSubmit) {
   const inp = h('input', {type:'password', inputmode:'numeric', autocomplete:'off', maxlength:4, placeholder:'PIN 4 ຕົວເລກ', 'aria-label':'PIN'});
@@ -449,7 +470,7 @@ function renderAdmin() {
     guests.length ? h('div', {}, h('b', {}, `ນັກສຶກສາທີ່ເພີ່ມເອງ (${guests.length})`),
       guests.map(s => h('div', {class:'row', style:'margin:2px 0'},
         h('span', {style:'flex:1;min-width:160px'}, `${s.no}. ${label(s)} · ${s.code}`),
-        h('button', {class:'danger', onclick: () => confirm(`ລຶບ ${label(s)} ອອກຈາກລະບົບ?`) && adminStu('admin_remove_student', {p_code:s.code})}, 'ລຶບ')))) : null));
+        h('button', {class:'danger', onclick: async () => { if (await ask(`ລຶບ ${label(s)} ອອກຈາກລະບົບ?`, 'ລຶບ', true)) adminStu('admin_remove_student', {p_code:s.code}); }}, 'ລຶບ')))) : null));
 
   // ---- roster upkeep: take out people who left (reversible), bring them back ----
   const removedList = allStudents.filter(s => s.active === false);
@@ -458,7 +479,7 @@ function renderAdmin() {
     h('div', {class:'mute'}, 'ເອົາອອກແລ້ວ ຊື່ຈະຫາຍຈາກໜ້າຂອງເພື່ອນ ແລະ ຖືກຖອດອອກຈາກກຸ່ມທີ່ເລືອກໄວ້ · ຄືນຊື່ມາໄດ້ຕະຫຼອດ'),
     students.map(s => h('div', {class:'row', style:'margin:2px 0'},
       h('span', {style:'flex:1;min-width:160px'}, `${s.no}. ${label(s)}${s.is_guest ? ' (ເພີ່ມເອງ)' : ''}`),
-      h('button', {class:'danger', onclick: () => confirm(`ເອົາ ${label(s)} ອອກຈາກລາຍຊື່? (ຖືກຖອດອອກຈາກກຸ່ມທັງໝົດ)`) && adminStu('admin_set_student_active', {p_code:s.code, p_active:false})}, 'ເອົາອອກ'))),
+      h('button', {class:'danger', onclick: async () => { if (await ask(`ເອົາ ${label(s)} ອອກຈາກລາຍຊື່? (ຖືກຖອດອອກຈາກກຸ່ມທັງໝົດ)`, 'ເອົາອອກ', true)) adminStu('admin_set_student_active', {p_code:s.code, p_active:false}); }}, 'ເອົາອອກ'))),
     removedList.length ? h('div', {style:'margin-top:12px'}, h('b', {}, `ເອົາອອກແລ້ວ (${removedList.length})`),
       removedList.map(s => h('div', {class:'row', style:'margin:2px 0'},
         h('span', {style:'flex:1;min-width:160px;color:var(--mute)'}, `${s.no}. ${label(s)}`),
@@ -492,11 +513,11 @@ function renderAdmin() {
       h('h2', {}, a.title, a.locked ? ' 🔒' : ''),
       h('div', {class:'mute'}, `${a.group_count} ກຸ່ມ × ${a.group_size} ຄົນ · ເລືອກແລ້ວ ${ms.length}/${students.length}`),
       h('div', {class:'row'},
-        h('button', {onclick: async () => { try { await navigator.clipboard.writeText(link); toast=''; } catch { prompt('ລິ້ງ', link); } }}, 'ຄັດລອກລິ້ງ'),
+        h('button', {onclick: async () => { try { await navigator.clipboard.writeText(link); toast=''; } catch { showLink(link); } }}, 'ຄັດລອກລິ້ງ'),
         h('button', {onclick:() => admin('admin_set_lock', {p_activity:a.id, p_locked:!a.locked})}, a.locked ? 'ປົດລ໋ອກ' : 'ລ໋ອກ'),
-        h('button', {disabled: !left || a.locked, onclick: () => confirm(`ສຸ່ມຈັດຄົນທີ່ເຫຼືອ ${left} ຄົນ?`) && admin('admin_random_fill', {p_activity:a.id})}, `ສຸ່ມຄົນທີ່ເຫຼືອ (${left})`),
+        h('button', {disabled: !left || a.locked, onclick: async () => { if (await ask(`ສຸ່ມຈັດຄົນທີ່ເຫຼືອ ${left} ຄົນ?`)) admin('admin_random_fill', {p_activity:a.id}); }}, `ສຸ່ມຄົນທີ່ເຫຼືອ (${left})`),
         h('button', {onclick:() => exportCsv(a, ms, codes)}, 'ດາວໂຫຼດ CSV'),
-        h('button', {class:'danger', onclick:() => confirm('ລຶບກິດຈະກຳນີ້?') && admin('admin_delete_activity', {p_activity:a.id})}, 'ລຶບ')));
+        h('button', {class:'danger', onclick: async () => { if (await ask('ລຶບກິດຈະກຳນີ້? (ລຶບກຸ່ມ ແລະ ໂນ້ດທັງໝົດຂອງກິດຈະກຳນີ້)', 'ລຶບ', true)) admin('admin_delete_activity', {p_activity:a.id}); }}, 'ລຶບ')));
     const dr = (drafts[a.id] ||= {open:false, title:a.title, count:a.group_count, size:a.group_size});
     box.append(h('details', {open: dr.open ? '' : null, ontoggle: e => { dr.open = e.target.open; }},
       h('summary', {}, 'ແກ້ໄຂຊື່ / ຈຳນວນກຸ່ມ / ຄົນຕໍ່ກຸ່ມ'),
@@ -508,7 +529,7 @@ function renderAdmin() {
           const cn = +dr.count, sz = +dr.size;
           if (!(cn >= 1 && cn <= 50 && sz >= 1 && sz <= 100)) { toast = 'ຈຳນວນກຸ່ມ 1-50 ແລະ ຄົນຕໍ່ກຸ່ມ 1-100'; return render(); }
           const gone = ms.filter(m => m.group_no > cn).length;
-          if (gone && !confirm(`ຫຼຸດເຫຼືອ ${cn} ກຸ່ມ ຈະຖອດ ${gone} ຄົນອອກຈາກກຸ່ມທີ່ຖືກລຶບ ດຳເນີນການຕໍ່ບໍ?`)) return;
+          if (gone && !(await ask(`ຫຼຸດເຫຼືອ ${cn} ກຸ່ມ ຈະຖອດ ${gone} ຄົນອອກຈາກກຸ່ມທີ່ຖືກລຶບ ດຳເນີນການຕໍ່ບໍ?`))) return;
           const r = await admin('admin_update_activity', {p_activity:a.id, p_title:(dr.title || '').trim() || a.title, p_count:cn, p_size:sz});
           if (!r.error) { delete drafts[a.id]; render(); }
         }}, 'ບັນທຶກ')),
