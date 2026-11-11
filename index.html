@@ -43,6 +43,10 @@ h2{font-family:var(--display);font-size:1.05rem;margin:0}
 .dots i.on{background:var(--gc,var(--c3))}
 .note{margin:0 0 10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .note.open{display:block;padding:9px 10px;border-radius:14px;background:color-mix(in srgb,var(--gc,var(--c3)) 12%,var(--card))}
+.ov{position:fixed;inset:0;background:rgba(20,5,5,.6);display:grid;place-items:center;z-index:50;padding:16px}
+.dlg{background:var(--card);border:2px solid var(--line);border-radius:22px;padding:18px;width:100%;max-width:340px;box-shadow:0 20px 40px -20px #000}
+.dlg input{width:100%;box-sizing:border-box;text-align:center;letter-spacing:.3em;font-size:1.2rem}
+.ncount{text-align:right;font-size:.75rem;color:var(--mute);margin-top:2px;font-variant-numeric:tabular-nums}
 .nline{flex:1;min-width:0;font-size:.88rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mute)}
 .nby{font-size:.75rem}
 .pen{min-height:30px!important;width:30px;padding:0!important;border-radius:50%!important;font-size:.95rem;line-height:1;color:var(--mute);flex:none;margin-left:auto}
@@ -306,8 +310,30 @@ function renderActivity(id) {
     h('div', {}, left.map(s => h('span', {}, h('i', {class:'av'}, initial(s)), label(s))))));
 }
 
+// centred dialog asking the person to re-enter their PIN before a note is saved
+function pinDialog(onSubmit) {
+  const inp = h('input', {type:'password', inputmode:'numeric', autocomplete:'off', maxlength:4, placeholder:'PIN 4 ຕົວເລກ', 'aria-label':'PIN'});
+  const err = h('div', {class:'nmsg bad'});
+  const ok = h('button', {class:'primary', style:'width:auto'}, 'ຢືນຢັນ');
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const submit = async () => {
+    if (!/^\d{4}$/.test(inp.value.trim())) { err.textContent = 'ໃສ່ PIN 4 ຕົວເລກ'; return; }
+    ok.disabled = true; err.textContent = '';
+    const m = await onSubmit(inp.value.trim());
+    if (m) { err.textContent = m; ok.disabled = false; inp.value = ''; inp.focus(); } else close();
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  ok.addEventListener('click', submit);
+  const ov = h('div', {class:'ov', role:'dialog', 'aria-modal':'true', onclick: e => { if (e.target === ov) close(); }},
+    h('div', {class:'dlg'}, h('h2', {style:'margin:0 0 6px'}, 'ຢືນຢັນ PIN'),
+      h('div', {class:'mute', style:'margin-bottom:10px'}, 'ໃສ່ PIN (4 ຕົວທ້າຍຂອງລະຫັດນັກສຶກສາ) ເພື່ອບັນທຶກໂນ້ດ'),
+      inp, err, h('div', {class:'row', style:'margin-bottom:0'}, ok, h('button', {onclick:close}, 'ຍົກເລີກ'))));
+  document.body.append(ov); document.addEventListener('keydown', onKey); inp.focus();
+}
+
 // a small message board per group: everyone reads it, only that group's members (and the admin) write
-const noteOpen = {}, noteMsg = {};
+const noteOpen = {}, noteMsg = {}, NOTE_MAX = 100;
 function noteBox(id, g, role, mine, mypin, adminPin) {
   const saved = notes.find(n => n.activity_id === id && n.group_no === g);
   const k = id + ':' + g, msg = noteMsg[k];
@@ -315,26 +341,33 @@ function noteBox(id, g, role, mine, mypin, adminPin) {
   if (!noteOpen[k]) {
     if (!saved && !role && !msg) return null;
     return h('div', {class:'note'},
-      saved ? h('div', {class:'nline'}, '📝 ' + saved.note, h('span', {class:'mute nby'}, ' — ' + saved.updated_by)) : null,
+      saved ? h('div', {class:'nline'}, '📝 ' + saved.note) : null,
       role ? h('button', {class:'pen', title:'ຂຽນໂນ້ດ', 'aria-label':'ຂຽນໂນ້ດຂອງກຸ່ມ', onclick: () => {
         noteOpen[k] = true; delete noteMsg[k]; render();
         setTimeout(() => app.querySelector('textarea[data-k="' + k + '"]')?.focus());
       }}, '✎') : null,
       msgEl);
   }
-  const ta = h('textarea', {rows:3, maxlength:300, 'data-k':k, placeholder:'ຂຽນບອກໝູ່ ເຊັ່ນ ກຸ່ມເຮົາເລືອກບົດທີ 3 ແລ້ວ ♡',
-    oninput: e => { noteDraft[k] = e.target.value; }});
+  const counter = h('div', {class:'ncount'});
+  const ta = h('textarea', {rows:3, maxlength:NOTE_MAX, 'data-k':k, placeholder:'ຂຽນບອກໝູ່ ເຊັ່ນ ກຸ່ມເຮົາເລືອກບົດທີ 3 ແລ້ວ ♡',
+    oninput: e => { noteDraft[k] = e.target.value; counter.textContent = e.target.value.length + '/' + NOTE_MAX; }});
   ta.value = k in noteDraft ? noteDraft[k] : (saved ? saved.note : '');
+  counter.textContent = ta.value.length + '/' + NOTE_MAX;
   const close = () => { noteOpen[k] = false; delete noteDraft[k]; render(); };
-  return h('div', {class:'note open'}, ta, h('div', {class:'row', style:'margin:6px 0 0'},
+  return h('div', {class:'note open'}, ta, counter, h('div', {class:'row', style:'margin:6px 0 0'},
     h('button', {class:'primary', style:'width:auto;min-height:36px;padding:4px 16px', onclick: async () => {
       const text = k in noteDraft ? noteDraft[k] : (saved ? saved.note : '');
-      const r = role === 'admin'
-        ? await rpc('admin_set_group_note', {p_pin:adminPin, p_activity:id, p_group:g, p_note:text})
-        : await rpc('set_group_note', {p_activity:id, p_code:mine, p_pin:mypin, p_group:g, p_note:text});
-      if (r.error) { noteMsg[k] = {t: r.error.message, bad: true}; }
-      else { noteOpen[k] = false; delete noteDraft[k]; noteMsg[k] = {t:'✓ ບັນທຶກແລ້ວ'}; setTimeout(() => { delete noteMsg[k]; render(); }, 2500); }
-      render();
+      const done = async () => { noteOpen[k] = false; delete noteDraft[k]; noteMsg[k] = {t:'✓ ບັນທຶກແລ້ວ'}; setTimeout(() => { delete noteMsg[k]; render(); }, 2500); await load(); render(); };
+      if (role === 'admin') {
+        const r = await rpc('admin_set_group_note', {p_pin:adminPin, p_activity:id, p_group:g, p_note:text});
+        if (r.error) noteMsg[k] = {t: r.error.message, bad: true}; else await done();
+        return render();
+      }
+      pinDialog(async pin => {
+        const r = await sb.rpc('set_group_note', {p_activity:id, p_code:mine, p_pin:pin, p_group:g, p_note:text});
+        if (r.error) return r.error.message;
+        await done(); return null;
+      });
     }}, 'ບັນທຶກ'),
     h('button', {style:'min-height:36px;padding:4px 14px', onclick:close}, 'ຍົກເລີກ')),
     msgEl);

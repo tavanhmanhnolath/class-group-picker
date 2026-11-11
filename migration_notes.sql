@@ -22,7 +22,7 @@ begin
   if not exists (select 1 from memberships where activity_id = p_activity and student_code = p_code and group_no = p_group) then
     raise exception 'ສະເພາະສະມາຊິກຂອງກຸ່ມນີ້ເທົ່ານັ້ນທີ່ຂຽນໄດ້';
   end if;
-  if char_length(n) > 300 then raise exception 'ຍາວເກີນ 300 ຕົວອັກສອນ'; end if;
+  if char_length(n) > 100 then raise exception 'ຍາວເກີນ 100 ຕົວອັກສອນ'; end if;
   if n = '' then
     delete from group_notes where activity_id = p_activity and group_no = p_group;
   else
@@ -43,7 +43,7 @@ begin
   select * into a from activities where id = p_activity;
   if not found then raise exception 'ບໍ່ພົບກິດຈະກຳ'; end if;
   if p_group < 1 or p_group > a.group_count then raise exception 'ກຸ່ມບໍ່ຖືກຕ້ອງ'; end if;
-  if char_length(n) > 300 then raise exception 'ຍາວເກີນ 300 ຕົວອັກສອນ'; end if;
+  if char_length(n) > 100 then raise exception 'ຍາວເກີນ 100 ຕົວອັກສອນ'; end if;
   if n = '' then
     delete from group_notes where activity_id = p_activity and group_no = p_group;
   else
