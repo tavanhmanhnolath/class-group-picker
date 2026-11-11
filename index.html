@@ -41,6 +41,11 @@ h2{font-family:var(--display);font-size:1.05rem;margin:0}
 .cnt.full{color:var(--bad);font-weight:600}
 .dots{display:inline-flex;gap:3px}.dots i{width:9px;height:9px;border-radius:50%;border:2px solid var(--gc,var(--c3));display:block}
 .dots i.on{background:var(--gc,var(--c3))}
+.note{margin:0 0 10px;padding:9px 10px;border-radius:14px;background:color-mix(in srgb,var(--gc,var(--c3)) 14%,var(--card));border:1.5px dashed var(--gc,var(--c3))}
+.nt{font-weight:600;font-size:.82rem;margin-bottom:4px}
+.nbody{font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.nby{font-size:.75rem;margin-top:3px}
+.note textarea{width:100%;box-sizing:border-box;font:inherit;font-size:.9rem;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:8px 10px;resize:vertical}
 ul{list-style:none;margin:0 0 10px;padding:0;min-height:30px}
 li{padding:3px 0;font-size:.92rem;display:flex;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere}
 li.self{font-weight:700;color:var(--accent)}
@@ -127,18 +132,21 @@ if (SUPABASE_URL.startsWith('PASTE')) {
 }
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let students = [], allStudents = [], activities = [], members = [], channel = null, toast = '';
+let students = [], allStudents = [], activities = [], members = [], notes = [], channel = null, toast = '';
+const noteDraft = {}; // unsent note text per group, kept across live re-renders
 const byCode = () => Object.fromEntries(students.map(s => [s.code, s]));
 const label = s => `${s.gender || ''} ${s.name}`.trim();
 const me = () => store.get('me');
 
 // students never change while the page is open, so they are fetched once
 async function load() {
-  const [s, a, m] = await Promise.all([
+  const [s, a, m, n] = await Promise.all([
     allStudents.length ? {data: allStudents} : sb.from('students').select('*').order('no'),
     sb.from('activities').select('*').order('created_at', {ascending:false}),
     sb.from('memberships').select('*'),
+    sb.from('group_notes').select('*'),
   ]);
+  notes = n.data || notes;
   const err = s.error || a.error || m.error;
   if (err) { toast = 'ໂຫຼດຂໍ້ມູນບໍ່ໄດ້: ' + err.message; }
   allStudents = s.data || allStudents;
@@ -165,6 +173,12 @@ function subscribe() {
       else members = members.filter(m => !sameKey(m, p.new)).concat(p.new);
       later(render);
     })
+    .on('postgres_changes', {event:'*', schema:'public', table:'group_notes'}, p => {
+      const same = (a, b) => a.activity_id === b.activity_id && a.group_no === b.group_no;
+      if (p.eventType === 'DELETE') notes = notes.filter(x => !same(x, p.old));
+      else notes = notes.filter(x => !same(x, p.new)).concat(p.new);
+      later(render);
+    })
     .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, () => later(async () => { await load(); render(); }))
     .on('postgres_changes', {event:'*', schema:'public', table:'students'}, () => later(async () => { allStudents = []; await load(); render(); }))
     .subscribe(status => {
@@ -174,9 +188,9 @@ function subscribe() {
     });
   setInterval(async () => { // safety net: resync once a minute, redraw only if something differs
     if (document.hidden) return;
-    const before = JSON.stringify([activities, members]);
+    const before = JSON.stringify([activities, members, notes]);
     await load();
-    if (JSON.stringify([activities, members]) !== before) render();
+    if (JSON.stringify([activities, members, notes]) !== before) render();
   }, 60000);
 }
 
@@ -187,12 +201,18 @@ function render() {
   // live updates rebuild the page; keep what the person is typing and which box has focus
   const old = [...app.querySelectorAll('input')];
   const typed = old.map(i => i.value), focused = old.indexOf(document.activeElement);
+  const fa = document.activeElement;
+  const focusedNote = fa && fa.tagName === 'TEXTAREA' && fa.dataset.k ? {k: fa.dataset.k, s: fa.selectionStart, e: fa.selectionEnd} : null;
   const r = route();
   app.replaceChildren();
   if (toast) app.append(h('div', {class:'banner err'}, toast));
   if (r === 'admin') renderAdmin();
   else if (r.startsWith('a/')) renderActivity(r.slice(2));
   else renderHome();
+  if (focusedNote) { // a note box being typed in keeps focus and cursor across live updates
+    const ta = [...app.querySelectorAll('textarea')].find(t => t.dataset.k === focusedNote.k);
+    if (ta) { ta.focus(); try { ta.setSelectionRange(focusedNote.s, focusedNote.e); } catch {} }
+  }
   const now = [...app.querySelectorAll('input')];
   if (!skipRestore && now.length === typed.length) {
     now.forEach((i, k) => { if (typed[k] !== '' && i.value !== typed[k]) i.value = typed[k]; });
@@ -252,6 +272,7 @@ function renderActivity(id) {
       h('span', {class:'mute'}, '4 ຕົວທ້າຍຂອງລະຫັດນັກສຶກສາ')));
   }
 
+  const adminPin = sget('pin');
   const grid = h('div', {class:'grid'});
   for (let g = 1; g <= a.group_count; g++) {
     const gm = ms.filter(m => m.group_no === g);
@@ -272,6 +293,7 @@ function renderActivity(id) {
         ? gm.map(m => { const st = codes[m.student_code];
             return h('li', {class: m.student_code === mine ? 'self' : ''}, h('span', {class:'av'}, st ? initial(st) : '?'), st ? label(st) : m.student_code); })
         : h('li', {class:'empty'}, 'ຍັງວ່າງ ມາເປັນຄົນທຳອິດນະ ♡')),
+      noteBox(id, g, isMine && mypin ? 'member' : adminPin ? 'admin' : null, mine, mypin, adminPin),
       btn));
   }
   app.append(grid);
@@ -280,6 +302,33 @@ function renderActivity(id) {
   const left = students.filter(s => !assigned.has(s.code));
   app.append(h('div', {class:'pool'}, h('b', {}, `ຍັງບໍ່ໄດ້ເລືອກກຸ່ມ (${left.length})`),
     h('div', {}, left.map(s => h('span', {}, h('i', {class:'av'}, initial(s)), label(s))))));
+}
+
+// a small message board per group: everyone reads it, only that group's members (and the admin) write
+function noteBox(id, g, role, mine, mypin, adminPin) {
+  const saved = notes.find(n => n.activity_id === id && n.group_no === g);
+  const box = h('div', {class:'note'}, h('div', {class:'nt'}, '📝 ໂນ້ດຂອງກຸ່ມ'));
+  if (!role) {
+    box.append(saved ? h('div', {class:'nbody'}, saved.note) : h('div', {class:'mute'}, 'ຍັງບໍ່ມີໂນ້ດ'));
+    if (saved) box.append(h('div', {class:'mute nby'}, '— ' + saved.updated_by));
+    return box;
+  }
+  const k = id + ':' + g, cur = k in noteDraft ? noteDraft[k] : (saved ? saved.note : '');
+  const ta = h('textarea', {rows:3, maxlength:300, 'data-k':k, placeholder:'ຂຽນບອກໝູ່ ເຊັ່ນ ກຸ່ມເຮົາເລືອກບົດທີ 3 ແລ້ວ ♡',
+    oninput: e => { noteDraft[k] = e.target.value; }});
+  ta.value = cur;
+  const dirty = k in noteDraft && noteDraft[k] !== (saved ? saved.note : '');
+  box.append(ta, h('div', {class:'row', style:'margin:6px 0 0'},
+    h('button', {class:'primary', style:'width:auto;min-height:36px;padding:4px 14px', disabled: !dirty, onclick: async () => {
+      const text = noteDraft[k] ?? '';
+      const r = role === 'admin'
+        ? await rpc('admin_set_group_note', {p_pin:adminPin, p_activity:id, p_group:g, p_note:text})
+        : await rpc('set_group_note', {p_activity:id, p_code:mine, p_pin:mypin, p_group:g, p_note:text});
+      if (!r.error) { delete noteDraft[k]; render(); }
+    }}, 'ບັນທຶກໂນ້ດ'),
+    h('span', {class:'mute'}, role === 'admin' ? 'ແອດມິນ' : 'ສະເພາະຄົນໃນກຸ່ມ')),
+    saved ? h('div', {class:'mute nby'}, '— ' + saved.updated_by) : null);
+  return box;
 }
 
 const drafts = {};
